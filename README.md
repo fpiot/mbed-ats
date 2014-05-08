@@ -40,6 +40,15 @@ $ sudo make install
 $ export PATSHOME=/usr/local/lib/ats2-postiats-0.0.8
 ```
 
+Compile the ATS source code for mbed.
+
+```
+$ cd mbed-ats
+$ make
+$ file demos/blink_ats/blink_ats.elf
+demos/blink_ats/blink_ats.elf: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), statically linked, not stripped
+```
+
 ## Write to the flash
 
 Upgrade firmware. Use rev 141212 or later firmware, to support CMSIS-DAP.
