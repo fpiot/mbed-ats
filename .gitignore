@@ -60,3 +60,10 @@ debug.log
 
 # Ignore OS X Desktop Services Store files
 .DS_Store
+
+# ATS
+demos/*/*.bin
+demos/*/*.d
+demos/*/*.elf
+demos/*/*.o
+demos/*_ats/main.c
