@@ -1,25 +1,35 @@
 %{^
 #include "LPC17xx.h"
+#include "wait_api.h"
 %}
 
 %{
-volatile int g_LoopDummy;
-
-void c_blink(void)
+void c_set_gpio1_fiodir(uint32_t val)
 {
-	LPC_GPIO1->FIODIR |= 1 << 18; // P1.18 connected to LED1
-	while(1)
-	{
-		int i;
+	LPC_GPIO1->FIODIR = val;
+}
 
-		LPC_GPIO1->FIOPIN ^= 1 << 18; // Toggle P1.18
-		for (i = 0 ; i < 5000000 && !g_LoopDummy ; i++)
-		{
-		}
-	}
+void c_set_gpio1_fiopin(uint32_t val)
+{
+	LPC_GPIO1->FIOPIN = val;
 }
 %}
 
-extern fun c_blink (): void = "mac#"
+#define BLINK_DELAY_US 500000
 
-implement main0 () = c_blink ()
+extern fun c_set_gpio1_fiodir(v: int): void = "mac#"
+extern fun c_set_gpio1_fiopin (v: int): void = "mac#"
+extern fun c_wait_us (us: int): void = "mac#wait_us"
+
+fun loop (): void = begin
+  c_set_gpio1_fiopin (0x40000); // 1 << 18
+  c_wait_us (BLINK_DELAY_US);
+  c_set_gpio1_fiopin (0x0);
+  c_wait_us (BLINK_DELAY_US);
+  loop ();
+end
+
+implement main0 () = begin
+  c_set_gpio1_fiodir (0xb40000); // 1<<18 | 1<<20 | 1<<21 | 1<<23
+  loop ();
+end
