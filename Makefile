@@ -1,4 +1,4 @@
-SUBDIRS         = demos/blink
+SUBDIRS         = demos/blink demos/blink_ats
 LIBMBED_LPC1768 = build/mbed/TARGET_LPC1768/TOOLCHAIN_GCC_ARM/libmbed.a
 BUILDPY_FLAG    = -m LPC1768 -t GCC_ARM
 
