@@ -1,5 +1,22 @@
---- 
-install: "sudo $TRAVIS_BUILD_DIR/travis/install_dependencies.sh > /dev/null"
-python: 
-  - "2.7"
-script: "python workspace_tools/build_travis.py"
+before_install:
+  - date
+  - cat /proc/cpuinfo
+  - cd ${HOME}
+  - sudo add-apt-repository -y ppa:terry.guo/gcc-arm-embedded
+  - sudo apt-get -qq -y update
+  - sudo apt-get -qq -y install gcc-arm-none-eabi libgmp-dev
+  - git clone https://github.com/githwxi/ATS-Postiats.git
+  # Build ATS1
+  - export ATSHOME=${HOME}/ats-lang-anairiats-0.2.11
+  - export ATSHOMERELOC=ATS-0.2.11
+  - ./ATS-Postiats/travis-ci/setup.sh 0.2.11
+  # Build ATS2
+  - export PATSHOME=${HOME}/ATS-Postiats
+  - export PATSHOMERELOC=${PATSHOME}
+  - export PATH=${PATH}:${PATSHOME}/bin
+  - cd ${PATSHOME} && make -f codegen/Makefile_atslib && make -f Makefile_devl src_depend && make -f Makefile_devl all
+script:
+  - cd ${TRAVIS_BUILD_DIR}
+  - make
+after_script:
+  - date
