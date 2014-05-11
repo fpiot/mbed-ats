@@ -1,5 +1,4 @@
-ATS programing on mbed
-======================
+# ATS programing on mbed [![Build Status](https://travis-ci.org/fpiot/mbed-ats.svg)](https://travis-ci.org/fpiot/mbed-ats)
 
 ## Hardware: [mbed LPC1768](http://mbed.org/platforms/mbed-LPC1768/)
 
