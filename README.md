@@ -10,9 +10,9 @@
 
 Also you could get [compatible boards](http://mbed.org/platforms/Seeeduino-Arch-Pro/).
 
-## How to build
+## Setup environment
 
-Get your own [Debian GNU/Linux](https://www.debian.org/) PC.
+### [Debian GNU/Linux](https://www.debian.org/)
 
 Install summon-arm-toolchain.
 
@@ -25,6 +25,32 @@ $ cd summon-arm-toolchain/
 $ ./summon-arm-toolchain
 $ export PATH=$HOME/sat/bin:$PATH
 ```
+
+### Mac OS X
+
+Install gmp package.
+
+```
+$ brew install gmp
+```
+
+Install GNU toolchain from ARM Cortex-M & Cortex-R processors https://launchpad.net/gcc-arm-embedded.
+
+```
+$ wget https://launchpad.net/gcc-arm-embedded/4.8/4.8-2014-q1-update/+download/gcc-arm-none-eabi-4_8-2014q1-20140314-mac.tar.bz2
+$ tar xf gcc-arm-none-eabi-4_8-2014q1-20140314-mac.tar.bz2
+$ cp -a gcc-arm-none-eabi-4_8-2014q1 /usr/local/gcc-arm-none-eabi
+$ export PATH=$PATH:/usr/local/gcc-arm-none-eabi/bin
+$ which arm-none-eabi-gcc
+/usr/local/gcc-arm-none-eabi/bin/arm-none-eabi-gcc
+```
+
+### Windows
+
+T.B.D.
+
+
+## How to build
 
 Install ATS2 http://www.ats-lang.org/.
 
