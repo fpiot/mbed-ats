@@ -65,5 +65,11 @@ gdbwrite: $(PROJECT).elf
 	@echo '#################################################################'
 	$(GDB) -x $(TOPDIR)/gdbwrite.boot $(PROJECT).elf
 
+gdbattach: all
+	@echo '############################################################'
+	@echo '##### Use me after running "sudo ./gdbserver4mbed.py". #####'
+	@echo '############################################################'
+	$(GDB) -x $(TOPDIR)/gdbattach.boot $(PROJECT).elf
+
 DEPS = $(OBJECTS:.o=.d) $(SYS_OBJECTS:.o=.d)
 -include $(DEPS)
