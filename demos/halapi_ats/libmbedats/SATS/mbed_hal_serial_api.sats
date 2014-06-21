@@ -4,6 +4,9 @@
 
 staload "libmbedats/SATS/mbed_hal_gpio_api.sats"
 
+macdef   USBTX = $extval(PinName, "USBTX")
+macdef   USBRX = $extval(PinName, "USBRX")
+
 abst@ype SerialParity  = $extype"SerialParity"
 macdef   ParityNone    = $extval(SerialParity, "ParityNone")
 macdef   ParityOdd     = $extval(SerialParity, "ParityOdd")
