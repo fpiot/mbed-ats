@@ -4,15 +4,15 @@
 staload UN = "prelude/SATS/unsafe.sats"
 staload "libmbedats/SATS/mbed_api_wait_api.sats"
 staload "libmbedats/SATS/mbed_hal_gpio_api.sats"
-staload "libmbedats/SATS/mbed_hal_serial_api.sats"
+staload "libmbedats/SATS/net_eth_EthernetInterface.sats"
 
 #define BLINK_DELAY_US 500000
 
 %{
-gpio_t c_led1;
-gpio_t c_led2;
-gpio_t c_led3;
-gpio_t c_led4;
+static gpio_t c_led1;
+static gpio_t c_led2;
+static gpio_t c_led3;
+static gpio_t c_led4;
 %}
 
 macdef led1 = $extval(gpio_t_p, "(&c_led1)")

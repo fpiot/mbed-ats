@@ -40,7 +40,7 @@ fun netif_set_down: (struct_netif_p) -> void = "mac#"
 (* lwip/tcpip *)
 typedef tcpip_init_done_fn = (ptr) -> void
 
-tcpip_init: (tcpip_init_done_fn, ptr) -> void = "mac#"
+fun tcpip_init: (tcpip_init_done_fn, ptr) -> void = "mac#"
 
 (* lwip/dhcp *)
 fun dhcp_start: (struct_netif_p) -> err_t = "mac#"
