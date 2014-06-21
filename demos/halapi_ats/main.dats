@@ -13,14 +13,12 @@ gpio_t c_led1;
 gpio_t c_led2;
 gpio_t c_led3;
 gpio_t c_led4;
-serial_t c_serial;
 %}
 
 macdef led1 = $extval(gpio_t_p, "(&c_led1)")
 macdef led2 = $extval(gpio_t_p, "(&c_led2)")
 macdef led3 = $extval(gpio_t_p, "(&c_led3)")
 macdef led4 = $extval(gpio_t_p, "(&c_led4)")
-macdef serial = $extval(serial_t_p, "(&c_serial)")
 
 fun loop (): void = {
   val () = gpio_write (led1, 1)
@@ -28,14 +26,14 @@ fun loop (): void = {
   val () = gpio_write (led3, 1)
   val () = gpio_write (led4, 0)
   val () = println! ("A", 1, "\r")
-  val () = wait_us (BLINK_DELAY_US);
+  val () = wait_us (BLINK_DELAY_US)
   val () = gpio_write (led1, 0)
   val () = gpio_write (led2, 1)
   val () = gpio_write (led3, 0)
   val () = gpio_write (led4, 1)
   val () = println! ("B", 2, "\r")
-  val () = wait_us (BLINK_DELAY_US);
-  val () = loop ();
+  val () = wait_us (BLINK_DELAY_US)
+  val () = loop ()
 }
 
 implement main0 () = {
@@ -44,5 +42,5 @@ implement main0 () = {
   val () = gpio_init_out (led3, LED3)
   val () = gpio_init_out (led4, LED4)
   val () = println! ("Hello world!\r")
-  val () = loop ();
+  val () = loop ()
 }
