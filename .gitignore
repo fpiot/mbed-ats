@@ -70,3 +70,6 @@ demos/*/*.d
 demos/*/*.elf
 demos/*/*.o
 demos/*_ats/main.c
+demos/*_ats/libmbedats/DATS/*.c
+demos/*_ats/libmbedats/DATS/*.d
+demos/*_ats/libmbedats/DATS/*.o
