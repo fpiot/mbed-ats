@@ -36,11 +36,19 @@ fun loop (): void = {
   val () = loop ()
 }
 
+fun init_ethernet (): void = {
+  val _ = EthernetInterface_init ()
+  val b = EthernetInterface_connect (15000U)
+  val () = println! ("EthernetInterface: ", b)
+  val _ = EthernetInterface_disconnect ()
+}
+
 implement main0 () = {
   val () = gpio_init_out (led1, LED1)
   val () = gpio_init_out (led2, LED2)
   val () = gpio_init_out (led3, LED3)
   val () = gpio_init_out (led4, LED4)
   val () = println! ("Hello world!\r")
+  val () = init_ethernet ()
   val () = loop ()
 }

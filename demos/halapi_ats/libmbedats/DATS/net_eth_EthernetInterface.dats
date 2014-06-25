@@ -55,14 +55,14 @@ extern praxi addback_macaddr {l:agz} (pf: struct_macaddr @ l): void
 fun tcpip_init_done (p: ptr): void = {
   val (pf | p) = takeout_tcpip_inited_id ()
   val _ = osSemaphoreRelease (!p)
-  val () = addback_tcpip_inited_id (pf)
+  prval () = addback_tcpip_inited_id (pf)
 }
 
 fun netif_link_callback (nif: struct_netif_p): void =
   if netif_is_link_up (nif) then {
     val (pf | p) = takeout_netif_linked_id ()
     val _ = osSemaphoreRelease (!p)
-    val () = addback_netif_linked_id (pf)
+    prval () = addback_netif_linked_id (pf)
   }
 
 fun netif_status_callback (nif: struct_netif_p): void =
@@ -74,7 +74,7 @@ fun netif_status_callback (nif: struct_netif_p): void =
      *)
     val (pf | p) = takeout_netif_up_id ()
     val _ = osSemaphoreRelease (!p)
-    val () = addback_netif_up_id (pf)
+    prval () = addback_netif_up_id (pf)
   }
 
 fun init_netif(ipaddr: ip_addr_t_p, netmask: ip_addr_t_p, gw: ip_addr_t_p): void = {
@@ -89,7 +89,7 @@ fun init_netif(ipaddr: ip_addr_t_p, netmask: ip_addr_t_p, gw: ip_addr_t_p): void
   val () = tcpip_init (tcpip_init_done, the_null_ptr)
   val (pf | p) = takeout_tcpip_inited_id ()
   val _ = osSemaphoreWait (!p, osWaitForever)
-  val () = addback_tcpip_inited_id (pf)
+  prval () = addback_tcpip_inited_id (pf)
   // Init netif
   val _ = $STRING.memset_unsafe(addr@netif, 0, sizeof<struct_netif>)
   val _ = netif_add(netif_p (), ipaddr, netmask, gw, the_null_ptr, eth_arch_enetif_init, tcpip_input)
@@ -111,7 +111,7 @@ implement EthernetInterface_init () = let
   val () = set_mac_address ()
   val () = init_netif(null_ip_addr_t_p (), null_ip_addr_t_p (), null_ip_addr_t_p ())
 in
-  0
+  true
 end
 
 // xxx Need init without DHCP ?
@@ -120,16 +120,16 @@ implement EthernetInterface_connect (timeout_ms) = let
   fun connect_dhcp (): int32 = let
       val _ = dhcp_start (netif_p ())
       val (pf | p) = takeout_netif_up_id ()
-      val r = osSemaphoreWait (!p, timeout_ms)
-      val () = addback_netif_up_id (pf)
+      val r = osSemaphoreWait (!p, $UN.cast timeout_ms)
+      prval () = addback_netif_up_id (pf)
     in
       r
     end
   fun connect_ip (): int32 = let
       val () = netif_set_up (netif_p ())
       val (pf | p) = takeout_netif_linked_id ()
-      val r = osSemaphoreWait (!p, timeout_ms)
-      val () = addback_netif_linked_id (pf)
+      val r = osSemaphoreWait (!p, $UN.cast timeout_ms)
+      prval () = addback_netif_linked_id (pf)
     in
       r
     end
