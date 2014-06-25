@@ -117,7 +117,6 @@ end
 // xxx Need init without DHCP ?
 
 implement EthernetInterface_connect (timeout_ms) = let
-  // xxx NOT YET
   fun connect_dhcp (): int32 = let
       val _ = dhcp_start (netif_p ())
       val (pf | p) = takeout_netif_up_id ()
@@ -153,13 +152,11 @@ implement EthernetInterface_disconnect () = true where {
   val () = eth_arch_disable_interrupts ()
 }
 
+implement EthernetInterface_getIPAddress () = get_netif_ip_addr (netif_p ())
+
 (* xxx Need the following ?
 char* EthernetInterface::getMACAddress() {
     return mac_addr;
-}
-
-char* EthernetInterface::getIPAddress() {
-    return ip_addr;
 }
 
 char* EthernetInterface::getGateway() {

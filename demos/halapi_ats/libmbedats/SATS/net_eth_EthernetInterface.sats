@@ -4,3 +4,4 @@ staload "libmbedats/SATS/net_lwip_lwip.sats"
 fun EthernetInterface_init: () -> int
 fun EthernetInterface_connect: (uint32) -> bool
 fun EthernetInterface_disconnect: () -> bool
+fun EthernetInterface_getIPAddress: () -> ip_addr_t

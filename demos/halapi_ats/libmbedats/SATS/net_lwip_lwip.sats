@@ -17,6 +17,12 @@ abst@ype struct_pbuf = $extype"struct pbuf"
 typedef struct_pbuf_p = cPtr0(struct_pbuf)
 
 (* lwip/netif *)
+%{
+#define c_netif_is_up(I)       netif_is_up((struct netif *)(I))
+#define c_netif_is_link_up(I)  netif_is_link_up((struct netif *)(I))
+#define c_get_netif_ip_addr(I)     (((struct netif *)(I))->ip_addr)
+%}
+
 abst@ype struct_netif = $extype"struct netif"
 typedef struct_netif_p = cPtr0(struct_netif)
 
@@ -24,10 +30,7 @@ typedef netif_init_fn = (struct_netif_p) -> err_t
 typedef netif_input_fn = (struct_pbuf_p, struct_netif_p) -> err_t
 typedef netif_status_callback_fn = (struct_netif_p) -> void
 
-%{
-#define c_netif_is_up(I)       netif_is_up((struct netif *)(I))
-#define c_netif_is_link_up(I)  netif_is_link_up((struct netif *)(I))
-%}
+fun get_netif_ip_addr: (struct_netif_p) -> ip_addr_t = "mac#c_get_netif_ip_addr"
 
 fun netif_is_up: (struct_netif_p) -> bool = "mac#c_netif_is_up"
 fun netif_is_link_up: (struct_netif_p) -> bool = "mac#c_netif_is_link_up"
