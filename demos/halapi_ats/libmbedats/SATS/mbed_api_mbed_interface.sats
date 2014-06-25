@@ -2,6 +2,5 @@
 #include "mbed_interface.h"
 %}
 
-typedef char_p = cPtr0(char)
-
-fun mbed_mac_address: (char_p) -> void = "mac#"
+typedef struct_macaddr = @[char][6]
+fun mbed_mac_address: {l: agz} (ptr l) -> void = "mac#"
