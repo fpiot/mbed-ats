@@ -68,9 +68,10 @@ fun netif_link_callback (nif: struct_netif_p): void =
 fun netif_status_callback (nif: struct_netif_p): void =
   if netif_is_up (nif) then {
     (* xxx Need the following ?
-       strcpy(ip_addr, inet_ntoa(netif->ip_addr));
-       strcpy(gateway, inet_ntoa(netif->gw));
-       strcpy(networkmask, inet_ntoa(netif->netmask)); *)
+      strcpy(ip_addr, inet_ntoa(netif->ip_addr));
+      strcpy(gateway, inet_ntoa(netif->gw));
+      strcpy(networkmask, inet_ntoa(netif->netmask));
+     *)
     val (pf | p) = takeout_netif_up_id ()
     val _ = osSemaphoreRelease (!p)
     val () = addback_netif_up_id (pf)
@@ -139,3 +140,33 @@ implement EthernetInterface_connect (timeout_ms) = let
 in
   if ($UN.cast2int(inited) > 0) then true else false
 end
+
+implement EthernetInterface_disconnect () = true where {
+  fun init (dhcp: bool) = if dhcp then {
+    val _ = dhcp_release (netif_p ())
+    val () = dhcp_stop (netif_p ())
+  } else {
+    val () = netif_set_down (netif_p ())
+  }
+  val b = $UN.ptr0_get<bool> (use_dhcp_p ())
+  val () = init (b)
+  val () = eth_arch_disable_interrupts ()
+}
+
+(* xxx Need the following ?
+char* EthernetInterface::getMACAddress() {
+    return mac_addr;
+}
+
+char* EthernetInterface::getIPAddress() {
+    return ip_addr;
+}
+
+char* EthernetInterface::getGateway() {
+    return gateway;
+}
+
+char* EthernetInterface::getNetworkMask() {
+    return networkmask;
+}
+*)
