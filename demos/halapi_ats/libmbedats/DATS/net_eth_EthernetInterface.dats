@@ -11,14 +11,9 @@ staload "libmbedats/SATS/mbed_api_mbed_interface.sats"
 #include "eth_arch.h"
 %}
 
-%{
-#define LEN_IP_ADDR 17
-static char ip_addr[LEN_IP_ADDR] = "\0";
-static char gateway[LEN_IP_ADDR] = "\0";
-static char networkmask[LEN_IP_ADDR] = "\0";
-%}
-
 extern fun eth_arch_enetif_init: netif_init_fn = "mac#"
+extern fun eth_arch_enable_interrupts: () -> void = "mac#"
+extern fun eth_arch_disable_interrupts: () -> void = "mac#"
 
 fun null_ip_addr_t_p () = $UN.castvwtp0{ip_addr_t_p}(the_null_ptr)
 
@@ -38,10 +33,14 @@ var tcpip_inited_def: osSemaphoreDef_t
 fun tcpip_inited_def_p (): osSemaphoreDef_t_p = $UN.castvwtp0 (addr@tcpip_inited_def)
 // state = netif_linked_{id,def}
 var netif_linked_id: osSemaphoreId
+fun takeout_netif_linked_id (): [l:agz] (osSemaphoreId @ l | ptr l) = $UN.castvwtp0 (addr@netif_linked_id)
+extern praxi addback_netif_linked_id {l:agz} (pf: osSemaphoreId @ l): void
 var netif_linked_def: osSemaphoreDef_t
 fun netif_linked_def_p (): osSemaphoreDef_t_p = $UN.castvwtp0 (addr@netif_linked_def)
 // state = netif_up_{id,def}
 var netif_up_id: osSemaphoreId
+fun takeout_netif_up_id (): [l:agz] (osSemaphoreId @ l | ptr l) = $UN.castvwtp0 (addr@netif_up_id)
+extern praxi addback_netif_up_id {l:agz} (pf: osSemaphoreId @ l): void
 var netif_up_def: osSemaphoreDef_t
 fun netif_up_def_p (): osSemaphoreDef_t_p = $UN.castvwtp0 (addr@netif_up_def)
 // state = macaddr
@@ -58,6 +57,24 @@ fun tcpip_init_done (p: ptr): void = {
   val _ = osSemaphoreRelease (!p)
   val () = addback_tcpip_inited_id (pf)
 }
+
+fun netif_link_callback (nif: struct_netif_p): void =
+  if netif_is_link_up (nif) then {
+    val (pf | p) = takeout_netif_linked_id ()
+    val _ = osSemaphoreRelease (!p)
+    val () = addback_netif_linked_id (pf)
+  }
+
+fun netif_status_callback (nif: struct_netif_p): void =
+  if netif_is_up (nif) then {
+    (* xxx Need the following ?
+       strcpy(ip_addr, inet_ntoa(netif->ip_addr));
+       strcpy(gateway, inet_ntoa(netif->gw));
+       strcpy(networkmask, inet_ntoa(netif->netmask)); *)
+    val (pf | p) = takeout_netif_up_id ()
+    val _ = osSemaphoreRelease (!p)
+    val () = addback_netif_up_id (pf)
+  }
 
 fun init_netif(ipaddr: ip_addr_t_p, netmask: ip_addr_t_p, gw: ip_addr_t_p): void = {
   // Init Semaphores
@@ -76,7 +93,8 @@ fun init_netif(ipaddr: ip_addr_t_p, netmask: ip_addr_t_p, gw: ip_addr_t_p): void
   val _ = $STRING.memset_unsafe(addr@netif, 0, sizeof<struct_netif>)
   val _ = netif_add(netif_p (), ipaddr, netmask, gw, the_null_ptr, eth_arch_enetif_init, tcpip_input)
   val () = netif_set_default (netif_p ())
-  // xxx NOT YET
+  val () = netif_set_link_callback (netif_p (), netif_link_callback);
+  val () = netif_set_status_callback (netif_p (), netif_status_callback);
 }
 
 fun set_mac_address (): void = {
@@ -93,4 +111,31 @@ implement EthernetInterface_init () = let
   val () = init_netif(null_ip_addr_t_p (), null_ip_addr_t_p (), null_ip_addr_t_p ())
 in
   0
+end
+
+// xxx Need init without DHCP ?
+
+implement EthernetInterface_connect (timeout_ms) = let
+  // xxx NOT YET
+  fun connect_dhcp (): int32 = let
+      val _ = dhcp_start (netif_p ())
+      val (pf | p) = takeout_netif_up_id ()
+      val r = osSemaphoreWait (!p, timeout_ms)
+      val () = addback_netif_up_id (pf)
+    in
+      r
+    end
+  fun connect_ip (): int32 = let
+      val () = netif_set_up (netif_p ())
+      val (pf | p) = takeout_netif_linked_id ()
+      val r = osSemaphoreWait (!p, timeout_ms)
+      val () = addback_netif_linked_id (pf)
+    in
+      r
+    end
+  val () = eth_arch_enable_interrupts ()
+  val b = $UN.ptr0_get<bool> (use_dhcp_p ())
+  val inited = if b then connect_dhcp () else connect_ip ()
+in
+  if ($UN.cast2int(inited) > 0) then true else false
 end

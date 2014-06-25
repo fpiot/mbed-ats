@@ -24,8 +24,13 @@ typedef netif_init_fn = (struct_netif_p) -> err_t
 typedef netif_input_fn = (struct_pbuf_p, struct_netif_p) -> err_t
 typedef netif_status_callback_fn = (struct_netif_p) -> void
 
-fun netif_is_up: (struct_netif_p) -> bool = "mac#"
-fun netif_is_link_up: (struct_netif_p) -> bool = "mac#"
+%{
+#define c_netif_is_up(I)       netif_is_up((struct netif *)(I))
+#define c_netif_is_link_up(I)  netif_is_link_up((struct netif *)(I))
+%}
+
+fun netif_is_up: (struct_netif_p) -> bool = "mac#c_netif_is_up"
+fun netif_is_link_up: (struct_netif_p) -> bool = "mac#c_netif_is_link_up"
 
 fun netif_add: (struct_netif_p, ip_addr_t_p, ip_addr_t_p, ip_addr_t_p, ptr, netif_init_fn, netif_input_fn) -> struct_netif_p = "mac#"
 fun netif_set_default: (struct_netif_p) -> void = "mac#"
