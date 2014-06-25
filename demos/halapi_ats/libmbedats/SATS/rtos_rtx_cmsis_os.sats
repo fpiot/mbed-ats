@@ -3,6 +3,7 @@
 %}
 
 abst@ype osSemaphoreId = $extype"osSemaphoreId"
+typedef osSemaphoreId_p = cPtr0(osSemaphoreId)
 
 abst@ype osSemaphoreDef_t = $extype"osSemaphoreDef_t"
 typedef osSemaphoreDef_t_p = cPtr0(osSemaphoreDef_t)
