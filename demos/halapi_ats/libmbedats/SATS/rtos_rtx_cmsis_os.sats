@@ -25,6 +25,8 @@ macdef osErrorValue           = $extval(osStatus, "osErrorValue")
 macdef osErrorOS              = $extval(osStatus, "osErrorOS")
 macdef os_status_reserved     = $extval(osStatus, "os_status_reserved")
 
+macdef osWaitForever          = $extval(uint32, "osWaitForever")
+
 fun osSemaphoreCreate: (osSemaphoreDef_t_p, int32) -> osSemaphoreId = "mac#"
 fun osSemaphoreWait: (osSemaphoreId, uint32) -> int32 = "mac#"
 fun osSemaphoreRelease: (osSemaphoreId) -> osStatus = "mac#"
