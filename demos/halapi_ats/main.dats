@@ -25,13 +25,11 @@ fun loop (): void = {
   val () = gpio_write (led2, 0)
   val () = gpio_write (led3, 1)
   val () = gpio_write (led4, 0)
-  val () = println! ("A", 1, "\r")
   val () = wait_us (BLINK_DELAY_US)
   val () = gpio_write (led1, 0)
   val () = gpio_write (led2, 1)
   val () = gpio_write (led3, 0)
   val () = gpio_write (led4, 1)
-  val () = println! ("B", 2, "\r")
   val () = wait_us (BLINK_DELAY_US)
   val () = loop ()
 }
@@ -39,9 +37,9 @@ fun loop (): void = {
 fun init_ethernet (): void = {
   val _ = EthernetInterface_init ()
   val b = EthernetInterface_connect (15000U)
-  val () = println! ("EthernetInterface: ", b)
+  val () = println! ("EthernetInterface: ", b, "\r")
   val ip = EthernetInterface_getIPAddress ()
-  val () = println! ("IP address: ", ip)
+  val () = println! ("IP address: ", ip, "\r")
   val _ = EthernetInterface_disconnect ()
 }
 

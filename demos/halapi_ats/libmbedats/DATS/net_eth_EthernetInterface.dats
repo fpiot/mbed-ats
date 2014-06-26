@@ -9,6 +9,15 @@ staload "libmbedats/SATS/mbed_api_mbed_interface.sats"
 
 %{^
 #include "eth_arch.h"
+
+void mbed_mac_address (char* mac) { // My own MAC address
+    mac[0] = 0x00;
+    mac[1] = 0x02;
+    mac[2] = 0xF7;
+    mac[3] = 0xF0;
+    mac[4] = 0x99;
+    mac[5] = 0x99;
+}
 %}
 
 extern fun eth_arch_enetif_init: netif_init_fn = "mac#"
@@ -26,6 +35,10 @@ macdef ip_addr_len = $extval(int, "IP_ADDR_LEN")
 macdef ip_addr = $extval(string, "c_ip_addr")
 
 // *** Global State on ATS ***
+%{
+#define semaphore_member_p(SEMD)  (&(((osSemaphoreDef_t *)(SEMD))->semaphore))
+%}
+extern fun semaphore_member_p: (osSemaphoreDef_t_p) -> ptr = "mac#"
 // state = netif
 var netif: struct_netif
 fun netif_p (): struct_netif_p = $UN.castvwtp0 (addr@netif)
@@ -38,18 +51,21 @@ fun takeout_tcpip_inited_id (): [l:agz] (osSemaphoreId @ l | ptr l) = $UN.castvw
 extern praxi addback_tcpip_inited_id {l:agz} (pf: osSemaphoreId @ l): void
 var tcpip_inited_def: osSemaphoreDef_t
 fun tcpip_inited_def_p (): osSemaphoreDef_t_p = $UN.castvwtp0 (addr@tcpip_inited_def)
+var tcpip_inited_data: @[uint32][2]
 // state = netif_linked_{id,def}
 var netif_linked_id: osSemaphoreId
 fun takeout_netif_linked_id (): [l:agz] (osSemaphoreId @ l | ptr l) = $UN.castvwtp0 (addr@netif_linked_id)
 extern praxi addback_netif_linked_id {l:agz} (pf: osSemaphoreId @ l): void
 var netif_linked_def: osSemaphoreDef_t
 fun netif_linked_def_p (): osSemaphoreDef_t_p = $UN.castvwtp0 (addr@netif_linked_def)
+var netif_linked_data: @[uint32][2]
 // state = netif_up_{id,def}
 var netif_up_id: osSemaphoreId
 fun takeout_netif_up_id (): [l:agz] (osSemaphoreId @ l | ptr l) = $UN.castvwtp0 (addr@netif_up_id)
 extern praxi addback_netif_up_id {l:agz} (pf: osSemaphoreId @ l): void
 var netif_up_def: osSemaphoreDef_t
 fun netif_up_def_p (): osSemaphoreDef_t_p = $UN.castvwtp0 (addr@netif_up_def)
+var netif_up_data: @[uint32][2]
 // state = macaddr
 local
   var _dat_macaddr: struct_macaddr // hide
@@ -57,7 +73,6 @@ in
   fun takeout_macaddr (): [l:agz] (struct_macaddr @ l | ptr l) = $UN.castvwtp0 (addr@_dat_macaddr)
 end
 extern praxi addback_macaddr {l:agz} (pf: struct_macaddr @ l): void
-
 
 fun tcpip_init_done (p: ptr): void = {
   val (pf | p) = takeout_tcpip_inited_id ()
@@ -84,13 +99,21 @@ fun netif_status_callback (nif: struct_netif_p): void =
     prval () = addback_netif_up_id (pf)
   }
 
+fun sem_create{l:addr} (def_p: osSemaphoreDef_t_p, dat_p: ptr l, count: int): osSemaphoreId = let
+  val _ = $STRING.memset_unsafe(dat_p, 0, sizeof<uint32>)
+  val p = semaphore_member_p (def_p)
+  val () = $UN.ptr0_set (p, dat_p)
+in
+  osSemaphoreCreate (def_p, $UN.cast (count))
+end
+
 fun init_netif(ipaddr: ip_addr_t_p, netmask: ip_addr_t_p, gw: ip_addr_t_p): void = {
   // Init Semaphores
-  val v = osSemaphoreCreate (tcpip_inited_def_p (), $UN.cast (0))
+  val v = sem_create (tcpip_inited_def_p (), addr@tcpip_inited_data, 0)
   val () = $UN.ptr0_set (addr@tcpip_inited_id, v)
-  val v = osSemaphoreCreate (netif_linked_def_p (), $UN.cast (0))
+  val v = sem_create (netif_linked_def_p (), addr@netif_linked_data, 0)
   val () = $UN.ptr0_set (addr@netif_linked_id, v)
-  val v = osSemaphoreCreate (netif_up_def_p (), $UN.cast (0))
+  val v = sem_create (netif_up_def_p (), addr@netif_up_data, 0)
   val () = $UN.ptr0_set (addr@netif_up_id, v)
   // Init & wait
   val () = tcpip_init (tcpip_init_done, the_null_ptr)
