@@ -40,6 +40,8 @@ fun init_ethernet (): void = {
   val _ = EthernetInterface_init ()
   val b = EthernetInterface_connect (15000U)
   val () = println! ("EthernetInterface: ", b)
+  val ip = EthernetInterface_getIPAddress ()
+  val () = println! ("IP address: ", ip)
   val _ = EthernetInterface_disconnect ()
 }
 

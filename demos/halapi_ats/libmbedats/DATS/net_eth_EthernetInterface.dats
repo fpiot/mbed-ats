@@ -17,6 +17,13 @@ extern fun eth_arch_disable_interrupts: () -> void = "mac#"
 
 fun null_ip_addr_t_p () = $UN.castvwtp0{ip_addr_t_p}(the_null_ptr)
 
+// *** Global State on C ***
+%{
+#define IP_ADDR_LEN  16
+static char c_ip_addr[IP_ADDR_LEN + 1] = "\0";
+%}
+macdef ip_addr_len = $extval(int, "IP_ADDR_LEN")
+macdef ip_addr = $extval(string, "c_ip_addr")
 
 // *** Global State on ATS ***
 // state = netif
@@ -68,10 +75,10 @@ fun netif_link_callback (nif: struct_netif_p): void =
 fun netif_status_callback (nif: struct_netif_p): void =
   if netif_is_up (nif) then {
     (* xxx Need the following ?
-      strcpy(ip_addr, inet_ntoa(netif->ip_addr));
       strcpy(gateway, inet_ntoa(netif->gw));
       strcpy(networkmask, inet_ntoa(netif->netmask));
      *)
+    val _ = inet_ntoa_r (get_netif_ip_addr (netif_p ()), ip_addr, ip_addr_len)
     val (pf | p) = takeout_netif_up_id ()
     val _ = osSemaphoreRelease (!p)
     prval () = addback_netif_up_id (pf)
@@ -114,8 +121,6 @@ in
   true
 end
 
-// xxx Need init without DHCP ?
-
 implement EthernetInterface_connect (timeout_ms) = let
   fun connect_dhcp (): int32 = let
       val _ = dhcp_start (netif_p ())
@@ -152,7 +157,7 @@ implement EthernetInterface_disconnect () = true where {
   val () = eth_arch_disable_interrupts ()
 }
 
-implement EthernetInterface_getIPAddress () = get_netif_ip_addr (netif_p ())
+implement EthernetInterface_getIPAddress () = ip_addr
 
 (* xxx Need the following ?
 char* EthernetInterface::getMACAddress() {

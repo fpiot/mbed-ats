@@ -42,6 +42,10 @@ fun netif_set_status_callback: (struct_netif_p, netif_status_callback_fn) -> voi
 fun netif_set_up: (struct_netif_p) -> void = "mac#"
 fun netif_set_down: (struct_netif_p) -> void = "mac#"
 
+(* lwip/inet *)
+
+fun inet_ntoa_r: (ip_addr_t, string, int) -> string = "mac#"
+
 // xxx #define inet_aton(cp, addr)   ipaddr_aton(cp, (ip_addr_t*)addr)
 // xxx #define inet_ntoa(addr)       ipaddr_ntoa((ip_addr_t*)&(addr))
 
