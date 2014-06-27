@@ -15,9 +15,6 @@ typedef struct_hostent_p = cPtr0(struct_hostent)
 fun gethostbyname: string -> struct_hostent_p = "mac#lwip_gethostbyname"
 // Also need gethostbyname_r() ?
 
-abst@ype struct_timeval = $extype"struct timeval"
-typedef struct_timeval_p = cPtr0(struct_timeval)
-
 absvtype Socket = ptr
 
 fun socket_open: (SOCKTYPE) -> Option_vt Socket
