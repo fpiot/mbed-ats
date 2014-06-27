@@ -12,9 +12,6 @@ macdef   SOCK_RAW      = $extval(SOCKTYPE, "SOCK_RAW")
 abst@ype struct_hostent = $extype"struct hostent"
 typedef struct_hostent_p = cPtr0(struct_hostent)
 
-fun gethostbyname: string -> struct_hostent_p = "mac#lwip_gethostbyname"
-// Also need gethostbyname_r() ?
-
 absvtype Socket = ptr
 
 fun socket_open: (SOCKTYPE) -> Option_vt Socket
