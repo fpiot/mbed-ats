@@ -1,7 +1,6 @@
 #include "share/atspre_staload.hats"
 
 staload UN = "prelude/SATS/unsafe.sats"
-staload STRING = "libc/SATS/string.sats"
 staload "libmbedats/SATS/rtos_rtx_cmsis_os.sats"
 staload "libmbedats/SATS/net_eth_EthernetInterface.sats"
 staload "libmbedats/SATS/net_lwip_lwip.sats"
@@ -100,7 +99,8 @@ fun netif_status_callback (nif: struct_netif_p): void =
   }
 
 fun sem_create{l:addr} (def_p: osSemaphoreDef_t_p, dat_p: ptr l, count: int): osSemaphoreId = let
-  val _ = $STRING.memset_unsafe(dat_p, 0, sizeof<uint32>)
+  extern fun memset: (ptr, int, size_t) -> ptr = "mac#"
+  val _ = memset(dat_p, 0, sizeof<uint32>)
   val p = semaphore_member_p (def_p)
   val () = $UN.ptr0_set (p, dat_p)
 in
@@ -121,7 +121,8 @@ fun init_netif(ipaddr: ip_addr_t_p, netmask: ip_addr_t_p, gw: ip_addr_t_p): void
   val _ = osSemaphoreWait (!p, osWaitForever)
   prval () = addback_tcpip_inited_id (pf)
   // Init netif
-  val _ = $STRING.memset_unsafe(addr@netif, 0, sizeof<struct_netif>)
+  extern fun memset: (ptr, int, size_t) -> ptr = "mac#"
+  val _ = memset(addr@netif, 0, sizeof<struct_netif>)
   val _ = netif_add(netif_p (), ipaddr, netmask, gw, the_null_ptr, eth_arch_enetif_init, tcpip_input)
   val () = netif_set_default (netif_p ())
   val () = netif_set_link_callback (netif_p (), netif_link_callback);
