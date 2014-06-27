@@ -5,6 +5,7 @@ staload UN = "prelude/SATS/unsafe.sats"
 staload "libmbedats/SATS/mbed_api_wait_api.sats"
 staload "libmbedats/SATS/mbed_hal_gpio_api.sats"
 staload "libmbedats/SATS/net_eth_EthernetInterface.sats"
+staload "libmbedats/SATS/net_lwip_Socket_Socket.sats"
 
 #define BLINK_DELAY_US 500000
 
