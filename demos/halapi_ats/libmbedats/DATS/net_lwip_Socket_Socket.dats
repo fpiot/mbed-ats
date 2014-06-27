@@ -86,9 +86,14 @@ implement socket_wait_readable (sock, tv_sec, tv_usec) =
 implement socket_wait_writable (sock, tv_sec, tv_usec) =
   socket_select (sock, tv_sec, tv_usec, false, true)
 
-implement socket_close (sock) = {
-  // xxx call close()
+implement socket_close (sock, shutdown) = {
+  macdef SHUT_RDWR = $extval(int, "SHUT_RDWR")
+  extern fun lwip_shutdown: (int, int) -> int = "mac#"
+  extern fun lwip_close: (int) -> int = "mac#"
+
   val (pfat | p) = Socket_takeout_struct (sock)
+  val _ = if shutdown then lwip_shutdown (p->sock_fd, SHUT_RDWR) else 0/*DUMMY*/
+  val _ = lwip_close (p->sock_fd)
   prval () = Socket_addback_struct (pfat | sock)
   val () = __free (sock) where {
     extern fun __free {vt:vtype} (x: vt): void = "atspre_mfree_gc"

@@ -23,4 +23,4 @@ fun socket_wait_writable: (!Socket, lint, lint) -> bool
 // xxx void set_blocking(bool blocking, unsigned int timeout=1500)
 // xxx int set_option(int level, int optname, const void *optval, socklen_t optlen)
 // xxx int get_option(int level, int optname, void *optval, socklen_t *optlen)
-fun socket_close: (Socket) -> void
+fun socket_close: (Socket, bool) -> void
