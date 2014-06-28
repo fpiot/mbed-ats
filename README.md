@@ -1,5 +1,9 @@
 # ATS programing on mbed [![Build Status](https://travis-ci.org/fpiot/mbed-ats.svg)](https://travis-ci.org/fpiot/mbed-ats)
 
+## Application Design
+
+![](draw/mbed_and_ats.png)
+
 ## Hardware: [mbed LPC1768](http://mbed.org/platforms/mbed-LPC1768/)
 
 [![](/img/mbed_LPC1768.jpg)](http://mbed.org/platforms/mbed-LPC1768/)
