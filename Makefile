@@ -2,6 +2,9 @@ SUBDIRS         = demos/blink demos/blink_ats
 LIBMBED_LPC1768 = build/mbed/TARGET_LPC1768/TOOLCHAIN_GCC_ARM/libmbed.a
 BUILDPY_FLAG    = -m LPC1768 -t GCC_ARM
 
+ODGS := $(wildcard draw/*.odg)
+PNGS := $(patsubst %.odg,%.png,${ODGS})
+
 all: $(LIBMBED_LPC1768)
 	@for i in $(SUBDIRS); do \
 		$(MAKE) -C $$i $@; \
@@ -16,4 +19,14 @@ clean:
 	done
 	rm -rf build
 
-.PHONY: all clean
+%.png: %.odg
+	unoconv -n -f png -o $@.tmp $< 2> /dev/null   || \
+          unoconv -f png -o $@.tmp $<                 || \
+	  unoconv -n -f png -o $@.tmp $< 2> /dev/null || \
+          unoconv -f png -o $@.tmp $<
+	convert -resize 600x $@.tmp $@
+	rm -f $@.tmp
+
+updatefig: $(PNGS)
+
+.PHONY: all clean updatefig
