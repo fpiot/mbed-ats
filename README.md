@@ -112,7 +112,7 @@ $ make gdbwrite
 
 T.B.D.
 
-# Original README
+# ========== Original README ==========
 
 =======
 mbed SDK
