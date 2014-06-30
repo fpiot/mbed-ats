@@ -29,13 +29,20 @@ TCPSocketConnection_addback_struct
 
 implement
 tcp_socket_connection_open () = let
-  val (pfgc, pfat | p) = ptr_alloc<TCPSocketConnection_struct> ()
-  val () = p->sock := socket_open (SOCK_STREAM)
-  val () = p->endpoint := endpoint_open ()
-  // xxx
-  val tsc = $UN.castvwtp0{TCPSocketConnection}((pfat, pfgc | p))
+  fun createtcp (sock: Socket): Option_vt TCPSocketConnection = let
+    val (pfgc, pfat | p) = ptr_alloc<TCPSocketConnection_struct> ()
+    val () = p->is_connected := false
+    val () = p->sock := sock
+    val () = p->endpoint := endpoint_open ()
+    val tcp = $UN.castvwtp0{TCPSocketConnection}((pfat, pfgc | p))
+  in
+    Some_vt tcp
+  end
+  val osock = socket_open (SOCK_STREAM)
 in
-  tsc
+  case+ osock of
+  | ~Some_vt sock => createtcp sock
+  | ~None_vt () => None_vt ()
 end
 
 implement

@@ -35,15 +35,21 @@ fun loop (): void = {
   val () = loop ()
 }
 
+fun init_tcp (): void = let
+  val otcp = tcp_socket_connection_open ()
+in
+  case+ otcp of
+  | ~Some_vt tcp => tcp_socket_connection_close (tcp)
+  | ~None_vt () => ()
+end
+
 fun init_ethernet (): void = {
   val _ = EthernetInterface_init ()
   val b = EthernetInterface_connect (15000U)
   val () = println! ("EthernetInterface: ", b, "\r")
   val ip = EthernetInterface_getIPAddress ()
   val () = println! ("IP address: ", ip, "\r")
-  val tcp = tcp_socket_connection_open ()
-  // xxx
-  val () = tcp_socket_connection_close (tcp)
+  val () = init_tcp ()
   val _ = EthernetInterface_disconnect ()
 }
 
