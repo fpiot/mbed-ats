@@ -41,9 +41,9 @@ end
 implement
 tcp_socket_connection_close (tsc) = {
   val (pfat | p) = TCPSocketConnection_takeout_struct (tsc)
-//  val () = endpoint_close (p->endpoint)
-//  val () = socket_close (p->sock, true)
-  prval () = TCPSocketConnection_addback_struct (pfat | tsc)
+  val () = endpoint_close (p->endpoint)
+  val () = socket_close (p->sock, true)
+  val () = $UN.castvwtp0((pfat | p))
   val () = __free (tsc) where {
     extern fun __free {vt:vtype} (x: vt): void = "atspre_mfree_gc"
   }
