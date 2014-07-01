@@ -77,6 +77,28 @@ in
 end
 
 implement
+tcp_socket_connection_receive (tcp) = let
+  val is_connected = tcp_socket_connection_is_connected (tcp)
+  val (pfat | p) = TCPSocketConnection_takeout_struct (tcp)
+  val fd = socket_sock_fd (p->sock)
+  val blocking = socket_blocking (p->sock)
+  prval () = TCPSocketConnection_addback_struct(pfat | tcp)
+in
+  if (fd < 0) orelse (not is_connected) then None_vt () else let
+      val b = if blocking then true else let
+                val (pfat | p) = TCPSocketConnection_takeout_struct (tcp)
+                val tout = socket_timeout (p->sock)
+                val r = socket_wait_readable (p->sock, tout)
+                prval () = TCPSocketConnection_addback_struct(pfat | tcp)
+              in
+                r
+              end
+    in
+      None_vt () // xxx
+    end
+end
+
+implement
 tcp_socket_connection_close (tcp) = {
   val (pfat | p) = TCPSocketConnection_takeout_struct (tcp)
   val () = endpoint_close (p->endpoint)

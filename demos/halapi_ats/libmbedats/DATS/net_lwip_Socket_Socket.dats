@@ -41,6 +41,22 @@ in
   sock_fd
 end
 
+implement socket_blocking (sock) = let
+  val (pfat | p) = Socket_takeout_struct (sock)
+  val blocking = p->blocking
+  prval () = Socket_addback_struct (pfat | sock)
+in
+  blocking
+end
+
+implement socket_timeout (sock) = let
+  val (pfat | p) = Socket_takeout_struct (sock)
+  val timeout = p->timeout
+  prval () = Socket_addback_struct (pfat | sock)
+in
+  timeout
+end
+
 implement socket_initsock (sock, socktype) = let
   fun createsock (sock: !Socket): bool = let
     fun setfd (sock: !Socket, fd: int): bool = let
@@ -68,8 +84,8 @@ end
 #define set_timeval_usec(tvp, usec)  ((struct timeval *)(tvp))->tv_usec = usec
 %}
 
-extern fun socket_select: (!Socket, lint, lint, bool, bool) -> bool
-implement socket_select (sock, tv_sec, tv_usec, read, write) = let
+extern fun socket_select: (!Socket, uint, bool, bool) -> bool
+implement socket_select (sock, ms, read, write) = let
   abst@ype struct_timeval = $extype"struct timeval"
   typedef struct_timeval_p = cPtr0(struct_timeval)
   abst@ype fd_set = $extype"fd_set"
@@ -85,8 +101,10 @@ implement socket_select (sock, tv_sec, tv_usec, read, write) = let
   var fdSet: fd_set
   var timeout: struct_timeval
   val sock_fd = socket_sock_fd (sock)
-  val () = set_timeval_sec ($UN.castvwtp0(addr@timeout), tv_sec)
-  val () = set_timeval_usec ($UN.castvwtp0(addr@timeout), tv_usec)
+  val tv_sec = ms / 1000U
+  val tv_usec = (ms - (tv_sec * 1000U)) * 1000U
+  val () = set_timeval_sec ($UN.castvwtp0(addr@timeout), $UN.cast(tv_sec))
+  val () = set_timeval_usec ($UN.castvwtp0(addr@timeout), $UN.cast(tv_usec))
   val () = FD_ZERO ($UN.castvwtp0(addr@fdSet))
   val () = FD_SET (sock_fd, $UN.castvwtp0(addr@fdSet))
   val readset = if read then $UN.castvwtp0{ptr}(addr@fdSet) else the_null_ptr
@@ -97,11 +115,11 @@ in
   then false else true
 end
 
-implement socket_wait_readable (sock, tv_sec, tv_usec) =
-  socket_select (sock, tv_sec, tv_usec, true, false)
+implement socket_wait_readable (sock, ms) =
+  socket_select (sock, ms, true, false)
 
-implement socket_wait_writable (sock, tv_sec, tv_usec) =
-  socket_select (sock, tv_sec, tv_usec, false, true)
+implement socket_wait_writable (sock, ms) =
+  socket_select (sock, ms, false, true)
 
 implement socket_finisock (sock, shutdown) = let
   macdef SHUT_RDWR = $extval(int, "SHUT_RDWR")

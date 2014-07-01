@@ -16,9 +16,11 @@ absvtype Socket = ptr
 
 fun socket_open: () -> Socket
 fun socket_sock_fd: (!Socket) -> int
+fun socket_blocking: (!Socket) -> bool
+fun socket_timeout: (!Socket) -> uint
 fun socket_initsock: (!Socket, SOCKTYPE) -> bool
-fun socket_wait_readable: (!Socket, lint, lint) -> bool
-fun socket_wait_writable: (!Socket, lint, lint) -> bool
+fun socket_wait_readable: (!Socket, uint) -> bool
+fun socket_wait_writable: (!Socket, uint) -> bool
 // xxx void set_blocking(bool blocking, unsigned int timeout=1500)
 // xxx int set_option(int level, int optname, const void *optval, socklen_t optlen)
 // xxx int get_option(int level, int optname, void *optval, socklen_t *optlen)
