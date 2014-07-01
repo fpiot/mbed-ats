@@ -38,6 +38,15 @@ in
 end
 
 implement
+tcp_socket_connection_is_connected (tcp) = let
+  val (pfat | p) = TCPSocketConnection_takeout_struct (tcp)
+  val r = p->is_connected
+  prval () = TCPSocketConnection_addback_struct(pfat | tcp)
+in
+  r
+end
+
+implement
 tcp_socket_connection_connect (tcp, host, port) = let
   val (pfat | p) = TCPSocketConnection_takeout_struct (tcp)
   val rs = socket_initsock (p->sock, SOCK_STREAM)
