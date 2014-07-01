@@ -45,11 +45,23 @@ tcp_socket_connection_connect (tcp, host, port) = let
       val re = endpoint_set_address (p->endpoint, host, port)
     in
       if re = false then false else let
+          abst@ype socklen_t = $extype"socklen_t"
+          extern fun lwip_connect: (int, struct_sockaddr_in_p, socklen_t) -> int = "mac#"
+          val fd = socket_sock_fd (p->sock)
+          val rh = endpoint_remoteHost (p->endpoint)
+          val rc = lwip_connect (fd, rh, $UN.cast (sizeof<struct_sockaddr_in>))
         in
-          true // xxx
+          if rc < 0 then let
+              val _ = socket_finisock (p->sock, true)
+            in
+              false
+            end else let
+              val () = p->is_connected := true
+            in
+              true
+            end
         end
     end
-  // xxx
   prval () = TCPSocketConnection_addback_struct(pfat | tcp)
 in
   ret
