@@ -29,20 +29,12 @@ TCPSocketConnection_addback_struct
 
 implement
 tcp_socket_connection_open () = let
-  fun createtcp (sock: Socket): Option_vt TCPSocketConnection = let
-    val (pfgc, pfat | p) = ptr_alloc<TCPSocketConnection_struct> ()
-    val () = p->is_connected := false
-    val () = p->sock := sock
-    val () = p->endpoint := endpoint_open ()
-    val tcp = $UN.castvwtp0{TCPSocketConnection}((pfat, pfgc | p))
-  in
-    Some_vt tcp
-  end
-  val osock = socket_open (SOCK_STREAM)
+  val (pfgc, pfat | p) = ptr_alloc<TCPSocketConnection_struct> ()
+  val () = p->is_connected := false
+  val () = p->sock := socket_open ()
+  val () = p->endpoint := endpoint_open ()
 in
-  case+ osock of
-  | ~Some_vt sock => createtcp sock
-  | ~None_vt () => None_vt ()
+  $UN.castvwtp0{TCPSocketConnection}((pfat, pfgc | p))
 end
 
 implement
@@ -58,7 +50,7 @@ implement
 tcp_socket_connection_close (tcp) = {
   val (pfat | p) = TCPSocketConnection_takeout_struct (tcp)
   val () = endpoint_close (p->endpoint)
-  val () = socket_close (p->sock, true)
+  val () = socket_close (p->sock)
   val () = $UN.castvwtp0((pfat | p))
   val () = __free (tcp) where {
     extern fun __free {vt:vtype} (x: vt): void = "atspre_mfree_gc"

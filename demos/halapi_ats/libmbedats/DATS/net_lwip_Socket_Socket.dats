@@ -24,22 +24,36 @@ Socket_addback_struct
 | sock: !Socket_minus_struct l >> Socket
 ) : void
 
-implement socket_open (socktype) = let
-  fun createsock (fd: int): Option_vt Socket = let
-      val (pfat, pfgc | p) = ptr_alloc<Socket_struct> ()
-      val () = p->sock_fd := fd
-      val () = p->blocking := true
-      val () = p->timeout := 1500U
-      val s = $UN.castvwtp0{Socket}((pfat, pfgc | p))
-    in
-      Some_vt s
-    end
-  val fd = lwip_socket (AF_INET, socktype, 0) where {
-    macdef AF_INET = $extval(int, "AF_INET")
-    extern fun lwip_socket: (int, SOCKTYPE, int) -> int = "mac#"
-  }
+implement socket_open () = let
+  val (pfat, pfgc | p) = ptr_alloc<Socket_struct> ()
+  val () = p->sock_fd := ~1
+  val () = p->blocking := true
+  val () = p->timeout := 1500U
 in
-  if fd < 0 then None_vt() else createsock fd
+  $UN.castvwtp0{Socket}((pfat, pfgc | p))
+end
+
+implement socket_initsock (sock, socktype) = let
+  fun createsock (sock: !Socket): bool = let
+    fun setfd (sock: !Socket, fd: int): bool = let
+        val (pfat | p) = Socket_takeout_struct (sock)
+        val () = p->sock_fd := fd
+        prval () = Socket_addback_struct (pfat | sock)
+      in
+        true
+      end
+    val fd = lwip_socket (AF_INET, socktype, 0) where {
+      macdef AF_INET = $extval(int, "AF_INET")
+      extern fun lwip_socket: (int, SOCKTYPE, int) -> int = "mac#"
+    }
+    in
+      if fd < 0 then false else setfd (sock, fd)
+    end
+  val (pfat | p) = Socket_takeout_struct (sock)
+  val sock_fd = p->sock_fd
+  prval () = Socket_addback_struct (pfat | sock)
+in
+  if sock_fd = ~1 then false else createsock (sock)
 end
 
 %{
@@ -86,15 +100,28 @@ implement socket_wait_readable (sock, tv_sec, tv_usec) =
 implement socket_wait_writable (sock, tv_sec, tv_usec) =
   socket_select (sock, tv_sec, tv_usec, false, true)
 
-implement socket_close (sock, shutdown) = {
+implement socket_finisock (sock, shutdown) = let
   macdef SHUT_RDWR = $extval(int, "SHUT_RDWR")
   extern fun lwip_shutdown: (int, int) -> int = "mac#"
   extern fun lwip_close: (int) -> int = "mac#"
-
+  fun close (sock: !Socket): bool = let
+      val (pfat | p) = Socket_takeout_struct (sock)
+      val _ = if shutdown then lwip_shutdown (p->sock_fd, SHUT_RDWR) else 0/*DUMMY*/
+      val _ = lwip_close (p->sock_fd)
+      val () = p->sock_fd := ~1
+      prval () = Socket_addback_struct (pfat | sock)
+    in
+      true
+    end
   val (pfat | p) = Socket_takeout_struct (sock)
-  val _ = if shutdown then lwip_shutdown (p->sock_fd, SHUT_RDWR) else 0/*DUMMY*/
-  val _ = lwip_close (p->sock_fd)
+  val sock_fd = p->sock_fd
   prval () = Socket_addback_struct (pfat | sock)
+in
+  if sock_fd < 0 then false else close (sock)
+end
+
+implement socket_close (sock) = {
+  val _ = socket_finisock (sock, true)
   val () = __free (sock) where {
     extern fun __free {vt:vtype} (x: vt): void = "atspre_mfree_gc"
   }

@@ -35,13 +35,10 @@ fun loop (): void = {
   val () = loop ()
 }
 
-fun init_tcp (): void = let
-  val otcp = tcp_socket_connection_open ()
-in
-  case+ otcp of
-  | ~Some_vt tcp => tcp_socket_connection_close (tcp)
-  | ~None_vt () => ()
-end
+fun init_tcp (): void = {
+  val tcp = tcp_socket_connection_open ()
+  val () = tcp_socket_connection_close (tcp)
+}
 
 fun init_ethernet (): void = {
   val _ = EthernetInterface_init ()
