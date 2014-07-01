@@ -33,6 +33,14 @@ in
   $UN.castvwtp0{Socket}((pfat, pfgc | p))
 end
 
+implement socket_sock_fd (sock) = let
+  val (pfat | p) = Socket_takeout_struct (sock)
+  val sock_fd = p->sock_fd
+  prval () = Socket_addback_struct (pfat | sock)
+in
+  sock_fd
+end
+
 implement socket_initsock (sock, socktype) = let
   fun createsock (sock: !Socket): bool = let
     fun setfd (sock: !Socket, fd: int): bool = let
@@ -49,11 +57,8 @@ implement socket_initsock (sock, socktype) = let
     in
       if fd < 0 then false else setfd (sock, fd)
     end
-  val (pfat | p) = Socket_takeout_struct (sock)
-  val sock_fd = p->sock_fd
-  prval () = Socket_addback_struct (pfat | sock)
 in
-  if sock_fd = ~1 then false else createsock (sock)
+  if socket_sock_fd (sock) = ~1 then false else createsock (sock)
 end
 
 %{
@@ -79,9 +84,7 @@ implement socket_select (sock, tv_sec, tv_usec, read, write) = let
 
   var fdSet: fd_set
   var timeout: struct_timeval
-  val (pfat | p) = Socket_takeout_struct (sock)
-  val sock_fd = p->sock_fd
-  prval () = Socket_addback_struct (pfat | sock)
+  val sock_fd = socket_sock_fd (sock)
   val () = set_timeval_sec ($UN.castvwtp0(addr@timeout), tv_sec)
   val () = set_timeval_usec ($UN.castvwtp0(addr@timeout), tv_usec)
   val () = FD_ZERO ($UN.castvwtp0(addr@fdSet))
@@ -113,11 +116,8 @@ implement socket_finisock (sock, shutdown) = let
     in
       true
     end
-  val (pfat | p) = Socket_takeout_struct (sock)
-  val sock_fd = p->sock_fd
-  prval () = Socket_addback_struct (pfat | sock)
 in
-  if sock_fd < 0 then false else close (sock)
+  if socket_sock_fd (sock) < 0 then false else close (sock)
 end
 
 implement socket_close (sock) = {

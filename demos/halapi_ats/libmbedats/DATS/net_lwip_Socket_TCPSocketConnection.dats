@@ -40,10 +40,19 @@ end
 implement
 tcp_socket_connection_connect (tcp, host, port) = let
   val (pfat | p) = TCPSocketConnection_takeout_struct (tcp)
+  val rs = socket_initsock (p->sock, SOCK_STREAM)
+  val ret = if rs = false then false else let
+      val re = endpoint_set_address (p->endpoint, host, port)
+    in
+      if re = false then false else let
+        in
+          true // xxx
+        end
+    end
   // xxx
   prval () = TCPSocketConnection_addback_struct(pfat | tcp)
 in
-  true // xxx
+  ret
 end
 
 implement

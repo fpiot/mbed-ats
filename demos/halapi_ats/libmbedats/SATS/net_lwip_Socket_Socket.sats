@@ -15,6 +15,7 @@ typedef struct_hostent_p = cPtr0(struct_hostent)
 absvtype Socket = ptr
 
 fun socket_open: () -> Socket
+fun socket_sock_fd: (!Socket) -> int
 fun socket_initsock: (!Socket, SOCKTYPE) -> bool
 fun socket_wait_readable: (!Socket, lint, lint) -> bool
 fun socket_wait_writable: (!Socket, lint, lint) -> bool
