@@ -4,9 +4,6 @@ staload UN = "prelude/SATS/unsafe.sats"
 staload "libmbedats/SATS/net_lwip_Socket_Socket.sats"
 staload "libmbedats/SATS/net_lwip_Socket_Endpoint.sats"
 
-abst@ype struct_sockaddr_in = $extype"struct sockaddr_in"
-typedef struct_sockaddr_in_p = cPtr0(struct_sockaddr_in)
-
 typedef Endpoint_struct = @{
   remoteHost= struct_sockaddr_in
 }
@@ -41,6 +38,14 @@ implement endpoint_open () = let
   val () = endpoint_reset_address (ep)
 in
   ep
+end
+
+implement endpoint_remoteHost (ep) = let
+  val (pfat | p) = Endpoint_takeout_struct (ep)
+  val sockaddr = $UN.castvwtp0{struct_sockaddr_in_p}(addr@(p->remoteHost))
+  prval () = Endpoint_addback_struct (pfat | ep)
+in
+  sockaddr
 end
 
 %{
