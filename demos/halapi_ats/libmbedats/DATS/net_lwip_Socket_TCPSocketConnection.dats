@@ -94,7 +94,18 @@ in
                 r
               end
     in
-      None_vt () // xxx
+      if b then let
+          extern fun lwip_recv: (int, ptr, size_t, int) -> int = "mac#"
+          #define N 127
+          #define CNUL '\000'
+          val N1 = succ(N)
+          val (pf, pfgc | p) = malloc_gc (i2sz N1)
+          val n = lwip_recv (fd, p, i2sz N, 0)
+          val () = $UN.ptr0_set<char>(ptr_add<char>(p, n), CNUL)
+          val s = $UN.castvwtp0{strptr}((pf, pfgc | p))
+        in
+          Some_vt (s)
+        end else None_vt ()
     end
 end
 
