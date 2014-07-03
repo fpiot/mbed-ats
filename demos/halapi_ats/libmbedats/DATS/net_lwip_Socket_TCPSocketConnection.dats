@@ -77,6 +77,51 @@ in
 end
 
 implement
+tcp_socket_connection_send_all (tcp, str) = let
+  fun loop (tcp: !TCPSocketConnection, str: !strptr, fd: int, written: int): Option_vt int = let
+      val (pfat | p) = TCPSocketConnection_takeout_struct (tcp)
+      val blocking = socket_blocking (p->sock)
+      prval () = TCPSocketConnection_addback_struct(pfat | tcp)
+      val b = if blocking then true else let
+                val (pfat | p) = TCPSocketConnection_takeout_struct (tcp)
+                val tout = socket_timeout (p->sock)
+                val r = socket_wait_writable (p->sock, tout)
+                prval () = TCPSocketConnection_addback_struct(pfat | tcp)
+              in
+                r
+              end
+    in
+      if b then let
+          extern fun lwip_send: (int, ptr, size_t, int) -> int = "mac#"
+          val p = strptr2ptr (str) // xxx
+          val len = $UN.cast(strptr_length (str)) // xxx
+          val r = lwip_send (fd, p, len, 0)
+        in
+          if r < 0 then None_vt () else if r = 0 then let
+              val (pfat | p) = TCPSocketConnection_takeout_struct (tcp)
+              val () = p->is_connected := false
+              prval () = TCPSocketConnection_addback_struct(pfat | tcp)
+            in
+              Some_vt (written)
+            end
+          else let
+              val written2 = written + r
+            in
+              Some_vt (written) // xxx tail call
+            end
+        end
+      else Some_vt (written)
+    end
+  val is_connected = tcp_socket_connection_is_connected (tcp)
+  val (pfat | p) = TCPSocketConnection_takeout_struct (tcp)
+  val fd = socket_sock_fd (p->sock)
+  val blocking = socket_blocking (p->sock)
+  prval () = TCPSocketConnection_addback_struct(pfat | tcp)
+in
+  if (fd < 0) orelse (not is_connected) then None_vt () else loop (tcp, str, fd, 0)
+end
+
+implement
 tcp_socket_connection_receive (tcp) = let
   val is_connected = tcp_socket_connection_is_connected (tcp)
   val (pfat | p) = TCPSocketConnection_takeout_struct (tcp)
