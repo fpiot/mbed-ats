@@ -92,10 +92,10 @@ tcp_socket_connection_send_all (tcp, str) = let
               end
     in
       if b then let
-          extern fun lwip_send: (int, ptr, size_t, int) -> int = "mac#"
-          val p = strptr2ptr (str) // xxx
-          val len = $UN.cast(strptr_length (str)) // xxx
-          val r = lwip_send (fd, p, len, 0)
+          extern fun lwip_send: (int, ptr, int, int) -> int = "mac#"
+          val p = strptr2ptr (str)
+          val len = $UN.cast{int}(length (str))
+          val r = lwip_send (fd, ptr_add<char>(p, written), len - written, 0)
         in
           if r < 0 then None_vt () else if r = 0 then let
               val (pfat | p) = TCPSocketConnection_takeout_struct (tcp)
@@ -107,7 +107,7 @@ tcp_socket_connection_send_all (tcp, str) = let
           else let
               val written2 = written + r
             in
-              Some_vt (written) // xxx tail call
+              if written2 >= len then Some_vt (written2) else loop (tcp, str, fd, written2)
             end
         end
       else Some_vt (written)
