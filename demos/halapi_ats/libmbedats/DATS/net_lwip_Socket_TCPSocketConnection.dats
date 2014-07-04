@@ -78,7 +78,7 @@ end
 
 implement
 tcp_socket_connection_send_all (tcp, str) = let
-  fun loop (tcp: !TCPSocketConnection, str: !strptr, fd: int, written: int): Option_vt int = let
+  fun loop (tcp: !TCPSocketConnection, str: string, fd: int, written: int): Option_vt int = let
       val (pfat | p) = TCPSocketConnection_takeout_struct (tcp)
       val blocking = socket_blocking (p->sock)
       prval () = TCPSocketConnection_addback_struct(pfat | tcp)
@@ -93,7 +93,7 @@ tcp_socket_connection_send_all (tcp, str) = let
     in
       if b then let
           extern fun lwip_send: (int, ptr, int, int) -> int = "mac#"
-          val p = strptr2ptr (str)
+          val p = string2ptr (str)
           val len = $UN.cast{int}(length (str))
           val r = lwip_send (fd, ptr_add<char>(p, written), len - written, 0)
         in

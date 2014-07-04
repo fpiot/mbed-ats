@@ -37,7 +37,12 @@ fun loop (): void = {
 
 fun init_tcp (): void = {
   val tcp = tcp_socket_connection_open ()
+  val r = tcp_socket_connection_connect (tcp, "www.reddit.com", 80)
+  val () = println! ("connect_ret: ", r, "\r")
+  val () = println! ("is_connected?: ", tcp_socket_connection_is_connected (tcp), "\r")
+//  val _ = tcp_socket_connection_send_all (tcp, "GET http://www.reddit.com/r/NetBSD/.rss HTTP/1.0\n\n")
   val () = tcp_socket_connection_close (tcp)
+  val () = print ("Called tcp_socket_connection_close\r\n")
 }
 
 fun init_ethernet (): void = {
@@ -48,6 +53,7 @@ fun init_ethernet (): void = {
   val () = println! ("IP address: ", ip, "\r")
   val () = init_tcp ()
   val _ = EthernetInterface_disconnect ()
+  val () = print ("Called EthernetInterface_disconnect\r\n")
 }
 
 implement main0 () = {
@@ -55,7 +61,7 @@ implement main0 () = {
   val () = gpio_init_out (led2, LED2)
   val () = gpio_init_out (led3, LED3)
   val () = gpio_init_out (led4, LED4)
-  val () = println! ("Hello world!\r")
+  val () = print ("Hello world!\r\n")
   val () = init_ethernet ()
   val () = loop ()
 }
