@@ -15,23 +15,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from host_test import Test, DefaultTest
-from sys import stdout
+class HelloTest():
+    HELLO_WORLD = "Hello World"
 
-class HelloTest(DefaultTest):
-    HELLO_WORLD = "Hello World\n"
+    def test(self, selftest):
+        c = selftest.mbed.serial_readline()
+        if c is None:
+           return selftest.RESULT_IO_SERIAL
+        selftest.notify("Read %d bytes:"% len(c))
+        selftest.notify(c.strip())
 
-    def print_result(self, result):
-       print "\n{%s}\n{end}" % result
-
-    def run(self):
-        c = self.mbed.serial.read(len(self.HELLO_WORLD))
-        stdout.write(c)
-        if c == self.HELLO_WORLD: # Hello World received
-            self.print_result('success')
+        result = True
+        # Because we can have targetID here let's try to decode
+        if len(c) < len(self.HELLO_WORLD):
+            result = False
         else:
-            self.print_result('failure')
-        stdout.flush()
-
-if __name__ == '__main__':
-    HelloTest().run()
+            result = self.HELLO_WORLD in c
+        return selftest.RESULT_SUCCESS if result else selftest.RESULT_FAILURE

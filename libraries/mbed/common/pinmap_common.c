@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 #include "pinmap.h"
-#include "error.h"
+#include "mbed_error.h"
 
 void pinmap_pinout(PinName pin, const PinMap *map) {
-    if (pin == NC) return;
+    if (pin == NC)
+        return;
 
     while (map->pin != NC) {
         if (map->pin == pin) {
@@ -33,11 +34,14 @@ void pinmap_pinout(PinName pin, const PinMap *map) {
 
 uint32_t pinmap_merge(uint32_t a, uint32_t b) {
     // both are the same (inc both NC)
-    if (a == b) return a;
+    if (a == b)
+        return a;
 
     // one (or both) is not connected
-    if (a == (uint32_t)NC) return b;
-    if (b == (uint32_t)NC) return a;
+    if (a == (uint32_t)NC)
+        return b;
+    if (b == (uint32_t)NC)
+        return a;
 
     // mis-match error case
     error("pinmap mis-match");
@@ -62,4 +66,24 @@ uint32_t pinmap_peripheral(PinName pin, const PinMap* map) {
     if ((uint32_t)NC == peripheral) // no mapping available
         error("pinmap not found for peripheral");
     return peripheral;
+}
+
+uint32_t pinmap_find_function(PinName pin, const PinMap* map) {
+    while (map->pin != NC) {
+        if (map->pin == pin)
+            return map->function;
+        map++;
+    }
+    return (uint32_t)NC;
+}
+
+uint32_t pinmap_function(PinName pin, const PinMap* map) {
+    uint32_t function = (uint32_t)NC;
+
+    if (pin == (PinName)NC)
+        return (uint32_t)NC;
+    function = pinmap_find_function(pin, map);
+    if ((uint32_t)NC == function) // no mapping available
+        error("pinmap not found for function");
+    return function;
 }

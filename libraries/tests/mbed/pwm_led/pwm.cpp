@@ -3,8 +3,33 @@
 #if defined(TARGET_K64F)
 #define TEST_LED D9
 
-#elif defined(TARGET_NUCLEO_F103RB)
+#elif defined(TARGET_NUCLEO_F030R8) || \
+      defined(TARGET_NUCLEO_F070RB) || \
+      defined(TARGET_NUCLEO_F072RB) || \
+      defined(TARGET_NUCLEO_F091RC) || \
+      defined(TARGET_NUCLEO_F103RB) || \
+      defined(TARGET_NUCLEO_F302R8) || \
+      defined(TARGET_NUCLEO_F303RE) || \
+      defined(TARGET_NUCLEO_F334R8) || \
+      defined(TARGET_NUCLEO_F401RE) || \
+      defined(TARGET_NUCLEO_F411RE) || \
+      defined(TARGET_NUCLEO_L053R8) || \
+      defined(TARGET_NUCLEO_L073RZ) || \
+      defined(TARGET_NUCLEO_L152RE)
 #define TEST_LED D3
+
+#elif defined (TARGET_K22F) || \
+      defined (TARGET_LPC824)
+#define TEST_LED LED_GREEN
+
+#elif defined (TARGET_MAXWSNENV)
+#define TEST_LED LED_GREEN
+
+#elif defined (TARGET_DISCO_F407VG) 
+#define TEST_LED LED1
+
+#elif defined(TARGET_SAMR21G18A) || defined(TARGET_SAMD21J18A)
+#define TEST_LED LED1
 
 #else
 #error This test is not supported on this target.

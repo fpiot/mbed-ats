@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "mbed_assert.h"
 #include "analogin_api.h"
 
 #include "cmsis.h"
 #include "pinmap.h"
-#include "error.h"
 #include "clk_freqs.h"
 #include "PeripheralPins.h"
 
@@ -27,9 +27,7 @@
 
 void analogin_init(analogin_t *obj, PinName pin) {
     obj->adc = (ADCName)pinmap_peripheral(pin, PinMap_ADC);
-    if (obj->adc == (ADCName)NC) {
-        error("ADC pin mapping failed");
-    }
+    MBED_ASSERT(obj->adc != (ADCName)NC);
 
     SIM->SCGC6 |= SIM_SCGC6_ADC0_MASK;
 
@@ -60,7 +58,6 @@ void analogin_init(analogin_t *obj, PinName pin) {
                | ADC_CFG1_ADICLK(clkdiv >> 2);  // Input Clock: (Bus Clock)/2
 
     ADC0->CFG2 = cfg2_muxsel            // ADxxb or ADxxa channels
-               | ADC_CFG2_ADACKEN_MASK  // Asynchronous Clock Output Enable
                | ADC_CFG2_ADHSC_MASK    // High-Speed Configuration
                | ADC_CFG2_ADLSTS(0);    // Long Sample Time Select
 

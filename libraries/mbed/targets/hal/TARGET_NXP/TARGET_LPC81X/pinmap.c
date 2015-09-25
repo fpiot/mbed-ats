@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "mbed_assert.h"
 #include "pinmap.h"
-#include "error.h"
+#include "mbed_error.h"
 
 __IO uint32_t* IOCON_REGISTERS[18] = {
         &LPC_IOCON->PIO0_0 , &LPC_IOCON->PIO0_1 , &LPC_IOCON->PIO0_2 ,
@@ -26,12 +27,22 @@ __IO uint32_t* IOCON_REGISTERS[18] = {
 };
 
 void pin_function(PinName pin, int function) {
-    
+    if (function == 0) {
+        // Disable initial fixed function for P0_2, P0_3 and P0_5
+        uint32_t enable = 0;
+        if (pin == P0_2)
+            enable = 1 << 3;
+        else if (pin == P0_3)
+            enable = 1 << 2;
+        else if (pin == P0_5)
+            enable = 1 << 6;
+        LPC_SWM->PINENABLE0 |= enable;
+    }
 }
 
 void pin_mode(PinName pin, PinMode mode) {
-    if (pin == (uint32_t)NC) { return; }
-    
+    MBED_ASSERT(pin != (PinName)NC);
+
     if ((pin == 10) || (pin == 11)) {
         // True open-drain pins can be configured for different I2C-bus speeds
         return;

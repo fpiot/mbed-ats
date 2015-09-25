@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "mbed_assert.h"
 #include <math.h>
 #include "spi_api.h"
 #include "cmsis.h"
 #include "pinmap.h"
-#include "error.h"
+#include "mbed_error.h"
 
 static const PinMap PinMap_SPI_SCLK[] = {
     {P0_6 , SPI_0, 0x02},
@@ -58,10 +59,7 @@ void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel
     SPIName spi_cntl = (SPIName)pinmap_merge(spi_sclk, spi_ssel);
     
     obj->spi = (LPC_SSP_TypeDef*)pinmap_merge(spi_data, spi_cntl);
-    
-    if ((int)obj->spi == NC) {
-        error("SPI pinout mapping failed");
-    }
+    MBED_ASSERT((int)obj->spi != NC);
     
     // enable power and clocking
     switch ((int)obj->spi) {
@@ -69,24 +67,25 @@ void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel
             LPC_SYSCON->SYSAHBCLKCTRL |= 1 << 11;
             LPC_SYSCON->SSP0CLKDIV = 0x01;
             LPC_SYSCON->PRESETCTRL |= 1 << 0;
+            if (sclk == P0_6) {
+                LPC_IOCON->SCK_LOC = 0x02;
+            }
+            else {
+                LPC_IOCON->SCK_LOC = 0x01;
+            }
             break;
         case SPI_1:
             LPC_SYSCON->SYSAHBCLKCTRL |= 1 << 18;
             LPC_SYSCON->SSP1CLKDIV = 0x01;
             LPC_SYSCON->PRESETCTRL |= 1 << 2;
+            LPC_IOCON->SCK1_LOC = 0x00;
+            LPC_IOCON->MISO1_LOC = 0x00;
+            LPC_IOCON->MOSI1_LOC = 0x00;
+            if (ssel != NC) {
+                LPC_IOCON->SSEL1_LOC = 0x00;
+            }
             break;
     }
-    
-    // set default format and frequency
-    if (ssel == NC) {
-        spi_format(obj, 8, 0, 0);  // 8 bits, mode 0, master
-    } else {
-        spi_format(obj, 8, 0, 1);  // 8 bits, mode 0, slave
-    }
-    spi_frequency(obj, 1000000);
-    
-    // enable the ssp channel
-    ssp_enable(obj);
     
     // pin out the spi pins
     pinmap_pinout(mosi, PinMap_SPI_MOSI);
@@ -100,11 +99,8 @@ void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel
 void spi_free(spi_t *obj) {}
 
 void spi_format(spi_t *obj, int bits, int mode, int slave) {
+    MBED_ASSERT((bits >= 4 && bits <= 16) || (mode >= 0 && mode <= 3));
     ssp_disable(obj);
-    
-    if (!(bits >= 4 && bits <= 16) || !(mode >= 0 && mode <= 3)) {
-        error("SPI format error");
-    }
     
     int polarity = (mode & 0x2) ? 1 : 0;
     int phase = (mode & 0x1) ? 1 : 0;
@@ -197,11 +193,11 @@ int spi_master_write(spi_t *obj, int value) {
 }
 
 int spi_slave_receive(spi_t *obj) {
-    return (ssp_readable(obj) && !ssp_busy(obj)) ? (1) : (0);
+    return ssp_readable(obj) ? (1) : (0);
 }
 
 int spi_slave_read(spi_t *obj) {
-    return obj->spi->DR;
+    return obj->spi->DR & 0xFFFF;
 }
 
 void spi_slave_write(spi_t *obj, int value) {

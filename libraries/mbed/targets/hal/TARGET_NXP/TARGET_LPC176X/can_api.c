@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "mbed_assert.h"
 #include "can_api.h"
 
 #include "cmsis.h"
 #include "pinmap.h"
-#include "error.h"
 
 #include <math.h>
 #include <string.h>
@@ -79,7 +79,45 @@ static inline void can_enable(can_t *obj) {
 }
 
 int can_mode(can_t *obj, CanMode mode) {
-    return 0; // not implemented
+    int success = 0;
+    switch (mode) {
+        case MODE_RESET:
+            // Clear all special modes
+            can_reset(obj);
+            obj->dev->MOD &=~ 0x06;
+            success = 1;
+            break;
+        case MODE_NORMAL:
+            // Clear all special modes
+            can_disable(obj);
+            obj->dev->MOD &=~ 0x06;
+            can_enable(obj);
+            success = 1;
+            break;
+        case MODE_SILENT:
+            // Set listen-only mode and clear self-test mode
+            can_disable(obj);
+            obj->dev->MOD |=  0x02;
+            obj->dev->MOD &=~ 0x04;
+            can_enable(obj);
+            success = 1;
+            break;
+        case MODE_TEST_LOCAL:
+            // Set self-test mode and clear listen-only mode
+            can_disable(obj);
+            obj->dev->MOD |=  0x04;
+            obj->dev->MOD &=~ 0x02;
+            can_enable(obj);
+            success = 1;
+            break;
+        case MODE_TEST_SILENT:
+        case MODE_TEST_GLOBAL:
+        default:
+            success = 0;
+            break;
+    }
+
+    return success;
 }
 
 int can_filter(can_t *obj, uint32_t id, uint32_t mask, CANFormat format, int32_t handle) {
@@ -258,9 +296,7 @@ void can_init(can_t *obj, PinName rd, PinName td) {
     CANName can_rd = (CANName)pinmap_peripheral(rd, PinMap_CAN_RD);
     CANName can_td = (CANName)pinmap_peripheral(td, PinMap_CAN_TD);
     obj->dev = (LPC_CAN_TypeDef *)pinmap_merge(can_rd, can_td);
-    if ((int)obj->dev == NC) {
-        error("CAN pin mapping failed");
-    }
+    MBED_ASSERT((int)obj->dev != NC);
 
     switch ((int)obj->dev) {
         case CAN_1: LPC_SC->PCONP |= 1 << 13; break;
@@ -318,6 +354,12 @@ int can_write(can_t *obj, CAN_Message msg, int cc) {
     const unsigned int *buf = (const unsigned int *)&m;
 
     CANStatus = obj->dev->SR;
+
+    // Send the message to ourself if in a test mode
+    if (obj->dev->MOD & 0x04) {
+        cc = 1;
+    }
+
     if (CANStatus & 0x00000004) {
         obj->dev->TFI1 = buf[0] & 0xC00F0000;
         obj->dev->TID1 = buf[1];

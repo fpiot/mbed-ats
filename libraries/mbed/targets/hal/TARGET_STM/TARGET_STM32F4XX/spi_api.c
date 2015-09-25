@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "mbed_assert.h"
 #include "spi_api.h"
 
 #if DEVICE_SPI
@@ -20,7 +21,6 @@
 
 #include "cmsis.h"
 #include "pinmap.h"
-#include "error.h"
 
 static const PinMap PinMap_SPI_SCLK[] = {
     {PA_5,  SPI_1, STM_PIN_DATA(2, 5)},
@@ -57,7 +57,7 @@ static const PinMap PinMap_SPI_SSEL[] = {
     {PA_4,  SPI_3, STM_PIN_DATA(2, 6)},
     {PA_15, SPI_1, STM_PIN_DATA(2, 5)},
     {PA_15, SPI_3, STM_PIN_DATA(2, 6)},
-    {PB_9,  SPI_2, STM_PIN_DATA(2, 5)}, 
+    {PB_9,  SPI_2, STM_PIN_DATA(2, 5)},
     {PB_12, SPI_2, STM_PIN_DATA(2, 5)},
     {NC,    NC,    0}
 };
@@ -75,9 +75,7 @@ void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel
     SPIName spi_data = (SPIName)pinmap_merge(spi_mosi, spi_miso);
     SPIName spi_cntl = (SPIName)pinmap_merge(spi_sclk, spi_ssel);
     obj->spi = (SPI_TypeDef*)pinmap_merge(spi_data, spi_cntl);
-    if ((int)obj->spi == NC) {
-        error("SPI pinout mapping failed");
-    }
+    MBED_ASSERT((int)obj->spi != NC);
 
     // enable power and clocking
     switch ((int)obj->spi) {
@@ -94,18 +92,6 @@ void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel
             RCC->APB1ENR |= RCC_APB1ENR_SPI3EN;
             break;
     }
-    
-
-    // set default format and frequency
-    if (ssel == NC) {
-        spi_format(obj, 8, 0, 0);  // 8 bits, mode 0, master
-    } else {
-        spi_format(obj, 8, 0, 1);  // 8 bits, mode 0, slave
-    }
-    spi_frequency(obj, 1000000);
-    
-    // enable the ssp channel
-    ssp_enable(obj);
 
     // pin out the spi pins
     pinmap_pinout(mosi, PinMap_SPI_MOSI);
@@ -113,8 +99,7 @@ void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel
     pinmap_pinout(sclk, PinMap_SPI_SCLK);
     if (ssel != NC) {
         pinmap_pinout(ssel, PinMap_SPI_SSEL);
-    }
-    else {
+    } else {
         // Use software slave management
         obj->spi->CR1 |= SPI_CR1_SSM | SPI_CR1_SSI;
     }
@@ -123,12 +108,8 @@ void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel
 void spi_free(spi_t *obj) {}
 
 void spi_format(spi_t *obj, int bits, int mode, int slave) {
+    MBED_ASSERT(((bits == 8) || (bits == 16)) && ((mode >= 0) && (mode <= 3)));
     ssp_disable(obj);
-    
-    if (!(bits == 8 || bits == 16) || !(mode >= 0 && mode <= 3)) {
-        error("SPI format error");
-    }
-    
 
     int polarity = (mode & 0x2) ? 1 : 0;
     int phase = (mode & 0x1) ? 1 : 0;
@@ -138,6 +119,11 @@ void spi_format(spi_t *obj, int bits, int mode, int slave) {
                      ((polarity) ? 1 : 0) << 1 |
                      ((slave) ? 0: 1) << 2 |
                      ((bits == 16) ? 1 : 0) << 11;
+
+    if (slave) {
+        // Use software slave management
+        obj->spi->CR1 |= SPI_CR1_SSM | SPI_CR1_SSI;
+    }
 
     if (obj->spi->SR & SPI_SR_MODF) {
         obj->spi->CR1 = obj->spi->CR1;

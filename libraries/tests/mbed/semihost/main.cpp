@@ -1,10 +1,18 @@
 #include "test_env.h"
+#include "semihost_api.h"
 
 #define MAC_VENDOR_ARM_0    0x00
 #define MAC_VENDOR_ARM_1    0x02
 #define MAC_VENDOR_ARM_2    0xF7
 
 int main() {
+    MBED_HOSTTEST_TIMEOUT(10);
+    MBED_HOSTTEST_SELECT(default_auto);
+    MBED_HOSTTEST_DESCRIPTION(Semihost);
+    MBED_HOSTTEST_START("MBED_22");
+
+    printf("Semihost connected: %s\n", (semihost_connected()) ? ("Yes") : ("No"));
+
     char uid[DEVICE_ID_LENGTH + 1] = {0};
     bool result = true;
 
@@ -26,6 +34,5 @@ int main() {
         printf("MAC Address Prefix: 00:02:F7, Vendor: ARM\r\n");
     }
 
-    notify_completion(result);
-    return 0;
+    MBED_HOSTTEST_RESULT(result);
 }

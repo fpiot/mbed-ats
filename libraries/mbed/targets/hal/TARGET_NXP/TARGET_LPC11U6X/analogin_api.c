@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+#include "mbed_assert.h"
 #include "analogin_api.h"
 #include "cmsis.h"
 #include "pinmap.h"
-#include "error.h"
+#include "mbed_error.h"
 
 #if DEVICE_ANALOGIN
 
@@ -50,9 +50,8 @@ static const PinMap PinMap_ADC[] = {
 void analogin_init(analogin_t *obj, PinName pin) {
     volatile uint32_t tmp;
     obj->adc = (ADCName)pinmap_peripheral(pin, PinMap_ADC);
-    if (obj->adc == (uint32_t)NC) {
-        error("ADC pin mapping failed");
-    }
+    MBED_ASSERT(obj->adc != (ADCName)NC);
+
     pinmap_pinout(pin, PinMap_ADC);
 
     __IO uint32_t *reg = (__IO uint32_t*)(LPC_IOCON_BASE + (pin & 0x1FF));
@@ -67,13 +66,15 @@ void analogin_init(analogin_t *obj, PinName pin) {
     // Enable clock for ADC
     LPC_SYSCON->SYSAHBCLKCTRL |= (1 << 13);
 
-    // Start ADC self-calibration
-    LPC_ADC->CTRL = (1UL << 30);
-    do {
-        tmp =  LPC_ADC->CTRL;
-    } while ((tmp & (1UL << 30)) != 0);
+    // Determine the clock divider for a 500kHz ADC clock during calibration
+    uint32_t clkdiv = (SystemCoreClock / 500000) - 1;
+    
+    // Perform a self-calibration
+    LPC_ADC->CTRL = (1UL << 30) | (clkdiv & 0xFF);
+    while ((LPC_ADC->CTRL & (1UL << 30)) != 0);
 
-    LPC_ADC->CTRL = 1; // Sampling clock: SystemClock divided by 1
+    // Sampling clock: SystemClock divided by 1
+    LPC_ADC->CTRL = 0;
 }
 
 static inline uint32_t adc_read(analogin_t *obj) {

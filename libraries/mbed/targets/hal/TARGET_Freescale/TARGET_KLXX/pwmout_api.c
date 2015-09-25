@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "mbed_assert.h"
 #include "pwmout_api.h"
 
 #include "cmsis.h"
 #include "pinmap.h"
-#include "error.h"
 #include "clk_freqs.h"
 #include "PeripheralPins.h"
 
@@ -26,30 +26,39 @@ static float pwm_clock;
 void pwmout_init(pwmout_t* obj, PinName pin) {
     // determine the channel
     PWMName pwm = (PWMName)pinmap_peripheral(pin, PinMap_PWM);
-    if (pwm == (PWMName)NC)
-        error("PwmOut pin mapping failed");
-    
+    MBED_ASSERT(pwm != (PWMName)NC);
+
     uint32_t clkdiv = 0;
     float clkval;
+
+#if defined(TARGET_KL43Z)
+    if (mcgirc_frequency()) {
+        SIM->SOPT2 |= SIM_SOPT2_TPMSRC(3); // Clock source: MCGIRCLK
+        clkval = mcgirc_frequency() / 1000000.0f;
+    } else {
+        SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1); // Clock source: IRC48M
+        clkval = CPU_INT_IRC_CLK_HZ / 1000000.0f;
+    }
+#else
     if (mcgpllfll_frequency()) {
         SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1); // Clock source: MCGFLLCLK or MCGPLLCLK
         clkval = mcgpllfll_frequency() / 1000000.0f;
     } else {
         SIM->SOPT2 |= SIM_SOPT2_TPMSRC(2); // Clock source: ExtOsc
         clkval = extosc_frequency() / 1000000.0f;
-    } 
-    
+    }
+#endif
     while (clkval > 1) {
         clkdiv++;
-        clkval /= 2.0;  
+        clkval /= 2.0;
         if (clkdiv == 7)
             break;
     }
     
     pwm_clock = clkval;
-    unsigned int port = (unsigned int)pin >> PORT_SHIFT;
+    unsigned int port  = (unsigned int)pin >> PORT_SHIFT;
     unsigned int tpm_n = (pwm >> TPM_SHIFT);
-    unsigned int ch_n = (pwm & 0xFF);
+    unsigned int ch_n  = (pwm & 0xFF);
 
     SIM->SCGC5 |= 1 << (SIM_SCGC5_PORTA_SHIFT + port);
     SIM->SCGC6 |= 1 << (SIM_SCGC6_TPM0_SHIFT + tpm_n);
@@ -79,12 +88,12 @@ void pwmout_write(pwmout_t* obj, float value) {
         value = 1.0;
     }
 
-    *obj->CnV = (uint32_t)((float)(*obj->MOD) * value);
+    *obj->CnV = (uint32_t)((float)(*obj->MOD + 1) * value);
     *obj->CNT = 0;
 }
 
 float pwmout_read(pwmout_t* obj) {
-    float v = (float)(*obj->CnV) / (float)(*obj->MOD);
+    float v = (float)(*obj->CnV) / (float)(*obj->MOD + 1);
     return (v > 1.0) ? (1.0) : (v);
 }
 
@@ -99,7 +108,7 @@ void pwmout_period_ms(pwmout_t* obj, int ms) {
 // Set the PWM period, keeping the duty cycle the same.
 void pwmout_period_us(pwmout_t* obj, int us) {
     float dc = pwmout_read(obj);
-    *obj->MOD = (uint32_t)(pwm_clock * (float)us);
+    *obj->MOD = (uint32_t)(pwm_clock * (float)us) - 1;
     pwmout_write(obj, dc);
 }
 

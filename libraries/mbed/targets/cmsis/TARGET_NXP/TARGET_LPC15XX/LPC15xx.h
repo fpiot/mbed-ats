@@ -159,9 +159,9 @@ typedef enum {
 
 typedef struct {                                    /*!< GPIO_PORT Structure                                                   */
   __IO uint8_t   B[76];                             /*!< Byte pin registers                                                    */
-  __I  uint32_t  RESERVED0[45];
+  __I  uint32_t  RESERVED0[1005];
   __IO uint32_t  W[76];                             /*!< Word pin registers                                                    */
-  __I  uint32_t  RESERVED1[1908];
+  __I  uint32_t  RESERVED1[948];
   __IO uint32_t  DIR[3];                            /*!< Port Direction registers                                              */
   __I  uint32_t  RESERVED2[29];
   __IO uint32_t  MASK[3];                           /*!< Port Mask register                                                    */
@@ -1502,7 +1502,11 @@ typedef struct {                                    /*!< C_CAN0 Structure       
   __IO uint32_t  CANIF2_ARB1;                       /*!< Message interface 1 arbitration 1                                     */
   __IO uint32_t  CANIF2_ARB2;                       /*!< Message interface 1 arbitration 2                                     */
   __IO uint32_t  CANIF2_MCTRL;                      /*!< Message interface 1 message control                                   */
-  __I  uint32_t  RESERVED2[25];
+  __IO uint32_t  CANIF2_DA1;                        /*!< Message interface 2 data A1                                           */
+  __IO uint32_t  CANIF2_DA2;                        /*!< Message interface 2 data A2                                           */
+  __IO uint32_t  CANIF2_DB1;                        /*!< Message interface 2 data B1                                           */
+  __IO uint32_t  CANIF2_DB2;                        /*!< Message interface 2 data B2                                           */
+  __I  uint32_t  RESERVED2[21];
   __I  uint32_t  CANTXREQ1;                         /*!< Transmission request 1                                                */
   __I  uint32_t  CANTXREQ2;                         /*!< Transmission request 2                                                */
   __I  uint32_t  RESERVED3[6];

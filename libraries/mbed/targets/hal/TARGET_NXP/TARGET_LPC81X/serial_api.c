@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 // math.h required for floating point operations for baud rate calculation
+#include "mbed_assert.h"
 #include <math.h>
 #include <string.h>
 
 #include "serial_api.h"
 #include "cmsis.h"
 #include "pinmap.h"
-#include "error.h"
+#include "mbed_error.h"
 
 /******************************************************************************
  * INITIALIZATION
@@ -116,9 +117,10 @@ void serial_init(serial_t *obj, PinName tx, PinName rx) {
     /* Peripheral reset control to UART, a "1" bring it out of reset. */
     LPC_SYSCON->PRESETCTRL &= ~(0x1 << (3 + uart_n));
     LPC_SYSCON->PRESETCTRL |=  (0x1 << (3 + uart_n));
-    
-    UARTSysClk = SystemCoreClock / LPC_SYSCON->UARTCLKDIV;
-    
+
+    // Derive UART Clock from MainClock    
+    UARTSysClk = MainClock / LPC_SYSCON->UARTCLKDIV;    
+
     // set default baud rate and format
     serial_baud  (obj, 9600);
     serial_format(obj, 8, ParityNone, 1);
@@ -180,15 +182,10 @@ void serial_baud(serial_t *obj, int baudrate) {
 
 void serial_format(serial_t *obj, int data_bits, SerialParity parity, int stop_bits) {
     // 0: 1 stop bits, 1: 2 stop bits
-    if (stop_bits != 1 && stop_bits != 2) {
-        error("Invalid stop bits specified");
-    }
+    MBED_ASSERT((stop_bits == 1) || (stop_bits == 2));
+    MBED_ASSERT((data_bits > 6) && (data_bits < 10)); // 0: 7 data bits ... 2: 9 data bits
+    MBED_ASSERT((parity == ParityNone) || (parity == ParityEven) || (parity == ParityOdd));
     stop_bits -= 1;
-    
-    // 0: 7 data bits ... 2: 9 data bits
-    if (data_bits < 7 || data_bits > 9) {
-        error("Invalid number of bits (%d) in serial format, should be 7..9", data_bits);
-    }
     data_bits -= 7;
     
     int paritysel;
@@ -197,11 +194,20 @@ void serial_format(serial_t *obj, int data_bits, SerialParity parity, int stop_b
         case ParityEven: paritysel = 2; break;
         case ParityOdd : paritysel = 3; break;
         default:
-            error("Invalid serial parity setting");
-            return;
+            break;
     }
-    
-    obj->uart->CFG = (data_bits << 2)
+
+    // First disable the the usart as described in documentation and then enable while updating CFG
+
+    // 24.6.1 USART Configuration register
+    // Remark: If software needs to change configuration values, the following sequence should
+    // be used: 1) Make sure the USART is not currently sending or receiving data. 2) Disable
+    // the USART by writing a 0 to the Enable bit (0 may be written to the entire register). 3)
+    // Write the new configuration value, with the ENABLE bit set to 1.
+    obj->uart->CFG &= ~(1 << 0);
+
+    obj->uart->CFG = (1 << 0) // this will enable the usart
+                   | (data_bits << 2)
                    | (paritysel << 4)
                    | (stop_bits << 6);
 }
@@ -296,7 +302,7 @@ void serial_set_flow_control(serial_t *obj, FlowControl type, PinName rxflow, Pi
     uint32_t regVal_rts, regVal_cts;
     
     swm_rts = &SWM_UART_RTS[obj->index];
-    swm_cts = &SWM_UART_CTS[obj->index];    
+    swm_cts = &SWM_UART_CTS[obj->index];
     regVal_rts = LPC_SWM->PINASSIGN[swm_rts->n] & ~(0xFF << swm_rts->offset);
     regVal_cts = LPC_SWM->PINASSIGN[swm_cts->n] & ~(0xFF << swm_cts->offset);
     
@@ -310,15 +316,15 @@ void serial_set_flow_control(serial_t *obj, FlowControl type, PinName rxflow, Pi
         LPC_SWM->PINASSIGN[swm_rts->n] = regVal_rts | (rxflow << swm_rts->offset);
         if (FlowControlRTS == type) {
             LPC_SWM->PINASSIGN[swm_cts->n] = regVal_cts | (0xFF << swm_cts->offset);
-            obj->uart->CFG &= ~CTSEN;           
+            obj->uart->CFG &= ~CTSEN;
         }
     }
     if ((FlowControlCTS == type || FlowControlRTSCTS == type) && (txflow != NC)) {
         LPC_SWM->PINASSIGN[swm_cts->n] = regVal_cts | (txflow << swm_cts->offset);
         obj->uart->CFG |= CTSEN;
         if (FlowControlCTS == type) {
-            LPC_SWM->PINASSIGN[swm_rts->n] = regVal_rts | (0xFF << swm_rts->offset);        
+            LPC_SWM->PINASSIGN[swm_rts->n] = regVal_rts | (0xFF << swm_rts->offset);
         }
-    }    
+    }
 }
 

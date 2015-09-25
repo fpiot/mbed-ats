@@ -4,6 +4,10 @@ Serial pc(USBTX, USBRX);
 
 #if defined(TARGET_LPC4088)
 Serial uart(P4_22, P4_23);
+#elif defined(TARGET_MAXWSNENV)
+Serial uart(P0_1, P0_0);
+#elif defined(TARGET_SAMR21G18A) || defined(TARGET_SAMD21J18A)
+Serial uart(PA16, PA17);
 #else
 Serial uart(p9, p10);
 #endif

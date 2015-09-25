@@ -5,6 +5,11 @@
 #ifdef TARGET_KL05Z
 #define SDA     PTB4
 #define SCL     PTB3
+
+#elif TARGET_K20D50M
+#define SDA     PTB1
+#define SCL     PTB0
+
 #else
 #define SDA     PTE25
 #define SCL     PTE24
@@ -24,6 +29,11 @@ float calc_3d_vector_len(float x, float y, float z) {
 #define MEASURE_DEVIATION_TOLERANCE     0.025   // 2.5%
 
 int main(void) {
+    MBED_HOSTTEST_TIMEOUT(15);
+    MBED_HOSTTEST_SELECT(default_auto);
+    MBED_HOSTTEST_DESCRIPTION(MMA8451Q accelerometer);
+    MBED_HOSTTEST_START("KL25Z_5");
+
     DigitalOut led(LED_GREEN);
     MMA8451Q acc(SDA, SCL, MMA8451_I2C_ADDRESS);
     bool result = true;
@@ -42,5 +52,5 @@ int main(void) {
         wait(0.5);
         led = !led;
     }
-    notify_completion(result);
+    MBED_HOSTTEST_RESULT(result);
 }

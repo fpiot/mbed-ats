@@ -73,3 +73,13 @@ demos/*_ats/main.c
 demos/*_ats/libmbedats/DATS/*.c
 demos/*_ats/libmbedats/DATS/*.d
 demos/*_ats/libmbedats/DATS/*.o
+
+# PyCharm
+*.idea
+
+# Cscope
+cscope.*
+
+# vim swap files
+*.swp
+*~

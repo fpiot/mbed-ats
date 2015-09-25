@@ -19,7 +19,6 @@
 
 #include "cmsis.h"
 #include "pinmap.h"
-#include "error.h"
 
 static const PinMap PinMap_SPI_SCLK[] = {
     {PTB0, SPI_0, 3},
@@ -51,9 +50,7 @@ void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel
     SPIName spi_cntl = (SPIName)pinmap_merge(spi_sclk, spi_ssel);
 
     obj->spi = (SPI_Type*)pinmap_merge(spi_data, spi_cntl);
-    if ((int)obj->spi == NC) {
-        error("SPI pinout mapping failed");
-    }
+    MBED_ASSERT((int)obj->spi != NC);
 
     // enable power and clocking
     switch ((int)obj->spi) {
@@ -62,14 +59,6 @@ void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel
           SIM->SCGC4 |= SIM_SCGC4_SPI0_MASK;
           break;
     }
-
-    // set default format and frequency
-    if (ssel == NC) {
-        spi_format(obj, 8, 0, 0);  // 8 bits, mode 0, master
-    } else {
-        spi_format(obj, 8, 0, 1);  // 8 bits, mode 0, slave
-    }
-    spi_frequency(obj, 1000000);
 
     // enable SPI
     obj->spi->C1 |= SPI_C1_SPE_MASK;
@@ -87,13 +76,8 @@ void spi_free(spi_t *obj) {
     // [TODO]
 }
 void spi_format(spi_t *obj, int bits, int mode, int slave) {
-    if (bits != 8) {
-        error("Only 8bits SPI supported");
-    }
-
-    if ((mode < 0) || (mode > 3)) {
-        error("SPI mode unsupported");
-    }
+    MBED_ASSERT(bits == 8);
+    MBED_ASSERT((mode >= 0) && (mode <= 3));
 
     uint8_t polarity = (mode & 0x2) ? 1 : 0;
     uint8_t phase = (mode & 0x1) ? 1 : 0;

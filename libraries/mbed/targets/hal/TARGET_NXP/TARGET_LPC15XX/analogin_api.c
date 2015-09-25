@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+#include "mbed_assert.h"
 #include "analogin_api.h"
 #include "cmsis.h"
 #include "pinmap.h"
-#include "error.h"
 
 #define ANALOGIN_MEDIAN_FILTER      1
 
@@ -55,9 +54,8 @@ static const PinMap PinMap_ADC[] = {
 
 void analogin_init(analogin_t *obj, PinName pin) {
     obj->adc = (ADCName)pinmap_peripheral(pin, PinMap_ADC);
-    if (obj->adc == (uint32_t)NC) {
-        error("ADC pin mapping failed");
-    }
+    MBED_ASSERT(obj->adc != (ADCName)NC);
+
     uint32_t port = (pin >> 5);
     // enable clock for GPIOx
     LPC_SYSCON->SYSAHBCLKCTRL0 |= (1UL << (14 + port));
@@ -79,19 +77,21 @@ void analogin_init(analogin_t *obj, PinName pin) {
         LPC_SYSCON->SYSAHBCLKCTRL0 |= (1 << 28);
     }
 
-    // select IRC as async. clock, divided by 1
+    // select IRC as asynchronous clock, divided by 1
     LPC_SYSCON->ADCASYNCCLKSEL  = 0;
     LPC_SYSCON->ADCASYNCCLKDIV  = 1;
 
     __IO LPC_ADC0_Type *adc_reg = (obj->adc < ADC1_0) ? (__IO LPC_ADC0_Type*)(LPC_ADC0) : (__IO LPC_ADC0_Type*)(LPC_ADC1);
 
-    // start calibration
-    adc_reg->CTRL |= (1UL << 30);
-    __NOP(); __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
+    // determine the system clock divider for a 500kHz ADC clock during calibration
+    uint32_t clkdiv = (SystemCoreClock / 500000) - 1;
+    
+    // perform a self-calibration
+    adc_reg->CTRL = (1UL << 30) | (clkdiv & 0xFF);
+    while ((adc_reg->CTRL & (1UL << 30)) != 0);
 
-    // asynchronous mode
+    // switch to asynchronous mode
     adc_reg->CTRL = (1UL << 8);
-
 }
 
 static inline uint32_t adc_read(analogin_t *obj) {

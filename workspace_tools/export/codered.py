@@ -6,7 +6,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,11 +25,18 @@ class CodeRed(Exporter):
     TARGETS = [
         'LPC1768',
         'LPC4088',
+        'LPC4088_DM',
+        'LPC4330_M4',
         'LPC1114',
         'LPC11U35_401',
         'LPC11U35_501',
         'UBLOX_C027',
         'ARCH_PRO',
+        'LPC1549',
+        'LPC11U68',
+        'LPCCAPPUCCINO',
+        'LPC824',
+        'LPC11U37H_401',
     ]
 
     def generate(self):
@@ -44,7 +51,7 @@ class CodeRed(Exporter):
             'linker_script': self.resources.linker_script,
             'object_files': self.resources.objects,
             'libraries': libraries,
-            'symbols': self.toolchain.get_symbols()
+            'symbols': self.get_symbols()
         }
         self.gen_file('codered_%s_project.tmpl' % self.target.lower(), ctx, '.project')
         self.gen_file('codered_%s_cproject.tmpl' % self.target.lower(), ctx, '.cproject')

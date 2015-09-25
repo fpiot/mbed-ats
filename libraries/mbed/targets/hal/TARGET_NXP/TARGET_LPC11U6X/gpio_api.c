@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "mbed_assert.h"
 #include "gpio_api.h"
 #include "pinmap.h"
 
@@ -26,26 +27,32 @@ static void gpio_enable(void) {
 }
 
 uint32_t gpio_set(PinName pin) {
+    MBED_ASSERT(pin != (PinName)NC);
     if (!gpio_enabled)
          gpio_enable();
     
-    int f = ((pin == P0_0)  ||
-             (pin == P0_10) ||
-             (pin == P0_15)) ? (1) : (0);
+    int func = ((pin == P0_0)  || // reset
+                (pin == P0_10) || // SWCLK
+                (pin == P0_11) || // TDI
+                (pin == P0_12) || // TMS
+                (pin == P0_13) || // TDO
+                (pin == P0_14) || // TRST
+                (pin == P0_15)) ? (1) : (0); // SWDIO
     
-    pin_function(pin, f);
+    pin_function(pin, func);
     
     return (1UL << ((int)pin >> PIN_SHIFT & 0x1F));
 }
 
 void gpio_init(gpio_t *obj, PinName pin) {
-    if(pin == NC) return;
-    
     obj->pin = pin;
+    if (pin == (PinName)NC)
+        return;
+
     obj->mask = gpio_set(pin);
     
     unsigned int port = (unsigned int)(pin >> PORT_SHIFT);
-    
+
     obj->reg_set = &LPC_GPIO_PORT->SET[port];
     obj->reg_clr = &LPC_GPIO_PORT->CLR[port];
     obj->reg_in  = &LPC_GPIO_PORT->PIN[port];
@@ -57,8 +64,13 @@ void gpio_mode(gpio_t *obj, PinMode mode) {
 }
 
 void gpio_dir(gpio_t *obj, PinDirection direction) {
+    MBED_ASSERT(obj->pin != (PinName)NC);
     switch (direction) {
-        case PIN_INPUT : *obj->reg_dir &= ~obj->mask; break;
-        case PIN_OUTPUT: *obj->reg_dir |=  obj->mask; break;
+        case PIN_INPUT :
+            *obj->reg_dir &= ~obj->mask;
+            break;
+        case PIN_OUTPUT:
+            *obj->reg_dir |=  obj->mask;
+            break;
     }
 }

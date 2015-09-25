@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *******************************************************************************
  */
+#include "mbed_assert.h"
 #include "spi_api.h"
 
 #if DEVICE_SPI
@@ -34,7 +35,6 @@
 #include <math.h>
 #include "cmsis.h"
 #include "pinmap.h"
-#include "error.h"
 
 static const PinMap PinMap_SPI_MOSI[] = {
     {PA_11, SPI_2, STM_PIN_DATA(GPIO_Mode_AF, GPIO_OType_PP, GPIO_PuPd_DOWN, GPIO_AF_5)},
@@ -102,9 +102,7 @@ void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel
 
     obj->spi = (SPIName)pinmap_merge(spi_data, spi_cntl);
 
-    if (obj->spi == (SPIName)NC) {
-        error("SPI pinout mapping failed");
-    }
+    MBED_ASSERT(obj->spi != (SPIName)NC);
 
     // Enable SPI clock
     if (obj->spi == SPI_2) {
@@ -125,13 +123,10 @@ void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel
     obj->cpha = SPI_CPHA_1Edge;
     obj->br_presc = SPI_BaudRatePrescaler_256;
 
-    if (ssel == NC) { // Master
-        obj->mode = SPI_Mode_Master;
-        obj->nss = SPI_NSS_Soft;
-    } else { // Slave
+    if (ssel != NC) {
         pinmap_pinout(ssel, PinMap_SPI_SSEL);
-        obj->mode = SPI_Mode_Slave;
-        obj->nss = SPI_NSS_Soft;
+    } else {
+        obj->nss = SPI_NSS_SOFT;
     }
 
     init_spi(obj);
@@ -169,13 +164,11 @@ void spi_format(spi_t *obj, int bits, int mode, int slave) {
             break;
     }
 
-    if (slave == 0) {
-        obj->mode = SPI_Mode_Master;
-        obj->nss = SPI_NSS_Soft;
-    } else {
-        obj->mode = SPI_Mode_Slave;
-        obj->nss = SPI_NSS_Hard;
+    if (obj->nss != SPI_NSS_SOFT) {
+        obj->nss = (slave) ? SPI_NSS_HARD_INPUT : SPI_NSS_HARD_OUTPUT;
     }
+
+    obj->mode = (slave) ? SPI_MODE_SLAVE : SPI_MODE_MASTER;
 
     init_spi(obj);
 }

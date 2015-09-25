@@ -6,15 +6,22 @@
 #include "cmsis_nvic.h"
 #include <string.h>
 
+#if defined(TARGET_SAMR21G18A) || defined(TARGET_SAMD21J18A)
+#define PIN_IN      (PA06)
+#define PIN_OUT     (PA07)
+#define NUM_VECTORS (16+28)
+
+#else
 #define PIN_IN      (p5)
 #define PIN_OUT     (p25)
 #define NUM_VECTORS (16+33)
+#endif
 
 DigitalOut out(PIN_OUT);
 DigitalOut myled(LED1);
 
 volatile int checks = 0;
-uint32_t int_table[NUM_VECTORS];
+uint32_t int_table[NUM_VECTORS] __attribute__ ((aligned(256)));
 
 #define FALLING_EDGE_COUNT 5
 
@@ -46,14 +53,17 @@ static bool test_once() {
 }
 
 int main() {
+    MBED_HOSTTEST_TIMEOUT(15);
+    MBED_HOSTTEST_SELECT(default_auto);
+    MBED_HOSTTEST_DESCRIPTION(Interrupt vector relocation);
+    MBED_HOSTTEST_START("MBED_A18");
 
     // First test, no table reallocation
     {
         printf("Starting first test (interrupts not relocated).\r\n");
         bool ret = test_once();
         if (ret == false) {
-            notify_completion(false);
-            return 1;
+            MBED_HOSTTEST_RESULT(false);
         }
     }
 
@@ -65,11 +75,9 @@ int main() {
 
         bool ret = test_once();
         if (ret == false) {
-            notify_completion(false);
-            return 1;
+            MBED_HOSTTEST_RESULT(false);
         }
     }
 
-    notify_completion(true);
-    return 0;
+    MBED_HOSTTEST_RESULT(true);
 }

@@ -25,22 +25,71 @@ void in_handler() {
 #define PIN_OUT     dp1
 #define PIN_IN      dp2
 
+#elif defined(TARGET_LPC1549)
+// TARGET_FF_ARDUINO cannot be used, because D0 is used as USBRX (USB serial
+// port pin), D1 is used as USBTX
+#define PIN_OUT     D2
+#define PIN_IN      D7
+
 #elif defined(TARGET_LPC4088)
 #define PIN_IN      (p11)
 #define PIN_OUT     (p12)
 
-#elif defined(TARGET_NUCLEO_F103RB) || \
-    defined(TARGET_NUCLEO_L152RE) || \
-    defined(TARGET_NUCLEO_F302R8) || \
-    defined(TARGET_NUCLEO_F030R8) || \
-    defined(TARGET_NUCLEO_F401RE) || \
-    defined(TARGET_NUCLEO_L053R8)
+#elif defined(TARGET_NUCLEO_F030R8) || \
+      defined(TARGET_NUCLEO_F070RB) || \
+      defined(TARGET_NUCLEO_F072RB) || \
+      defined(TARGET_NUCLEO_F091RC) || \
+      defined(TARGET_NUCLEO_F103RB) || \
+      defined(TARGET_NUCLEO_F302R8) || \
+      defined(TARGET_NUCLEO_F303RE) || \
+      defined(TARGET_NUCLEO_F334R8) || \
+      defined(TARGET_NUCLEO_F401RE) || \
+      defined(TARGET_NUCLEO_F411RE) || \
+      defined(TARGET_NUCLEO_F446RE) || \
+      defined(TARGET_NUCLEO_L053R8) || \
+      defined(TARGET_NUCLEO_L073RZ) || \
+      defined(TARGET_NUCLEO_L152RE)
 #define PIN_IN      PB_8
-#define PIN_OUT     PC_6
+#define PIN_OUT     PC_7
+
+#elif defined(TARGET_ARCH_MAX) || \
+      defined(TARGET_DISCO_F407VG) || \
+      defined(TARGET_DISCO_F429ZI)|| \
+      defined(TARGET_DISCO_F401VC)
+#define PIN_OUT    PC_12
+#define PIN_IN     PD_0
+
+#elif defined(TARGET_RZ_A1H)
+#define PIN_OUT    D1
+#define PIN_IN     D5
 
 #elif defined(TARGET_FF_ARDUINO)
 #define PIN_OUT    D0
 #define PIN_IN     D7
+
+#elif defined(TARGET_MAXWSNENV)
+#define PIN_OUT    P0_0
+#define PIN_IN     P0_1
+
+#elif defined(TARGET_MAX32600MBED)
+#define PIN_OUT    P1_0
+#define PIN_IN     P4_7
+
+#elif defined(TARGET_EFM32LG_STK3600) || defined(TARGET_EFM32GG_STK3700) || defined(TARGET_EFM32WG_STK3800)
+#define PIN_OUT    PD0
+#define PIN_IN     PC3
+
+#elif defined(TARGET_EFM32ZG_STK3200)
+#define PIN_OUT    PD7
+#define PIN_IN     PC1
+
+#elif defined(TARGET_EFM32HG_STK3400)
+#define PIN_OUT    PE10
+#define PIN_IN     PC1
+
+#elif defined(TARGET_SAMR21G18A) || defined(TARGET_SAMD21J18A)
+#define PIN_OUT    PA06
+#define PIN_IN     PA07
 
 #else
 #define PIN_IN      (p5)
@@ -51,24 +100,33 @@ void in_handler() {
 DigitalOut out(PIN_OUT);
 InterruptIn in(PIN_IN);
 
+#define IN_OUT_SET      out = 1; myled = 1;
+#define IN_OUT_CLEAR    out = 0; myled = 0;
+
 void flipper() {
     for (int i = 0; i < 5; i++) {
-        out = 1; myled = 1; wait(0.2);
-
-        out = 0; myled = 0; wait(0.2);
+        IN_OUT_SET;
+        wait(0.2);
+        IN_OUT_CLEAR;
+        wait(0.2);
     }
 }
 
 int main() {
-    out = 0; myled = 0;
+    MBED_HOSTTEST_TIMEOUT(15);
+    MBED_HOSTTEST_SELECT(default_auto);
+    MBED_HOSTTEST_DESCRIPTION(InterruptIn);
+    MBED_HOSTTEST_START("MBED_A7");
+
+    IN_OUT_CLEAR;
     //Test falling edges first
     in.rise(NULL);
     in.fall(in_handler);
     flipper();
 
     if(checks != 5) {
-        printf("falling edges test failed: %d\n",checks);
-        notify_completion(false);
+        printf("MBED: falling edges test failed: %d\r\n",checks);
+        MBED_HOSTTEST_RESULT(false);
     }
 
     //Now test rising edges
@@ -77,8 +135,18 @@ int main() {
     flipper();
 
     if (checks != 10) {
-        printf("raising edges test failed: %d\n",checks);
-        notify_completion(false);
+        printf("MBED: raising edges test failed: %d\r\n", checks);
+        MBED_HOSTTEST_RESULT(false);
+    }
+
+    //Now test switch off edge detection
+    in.rise(NULL);
+    in.fall(NULL);
+    flipper();
+
+    if (checks != 10) {
+        printf("MBED: edge detection switch off test failed: %d\r\n", checks);
+        MBED_HOSTTEST_RESULT(false);
     }
 
     //Finally test both
@@ -87,10 +155,9 @@ int main() {
     flipper();
 
     if (checks != 20) {
-        printf("Simultaneous rising and falling edges failed\n");
-        notify_completion(false);
+        printf("MBED: Simultaneous rising and falling edges failed: %d\r\n", checks);
+        MBED_HOSTTEST_RESULT(false);
     }
 
-    notify_completion(true);
-    return 0;
+    MBED_HOSTTEST_RESULT(true);
 }

@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 """
 mbed SDK
-Copyright (c) 2011-2013 ARM Limited
+Copyright (c) 2011-2014 ARM Limited
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,35 +16,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-Author: Przemyslaw Wirkus <Przemyslaw.wirkus@arm.com>
+Author: Przemyslaw Wirkus <Przemyslaw.Wirkus@arm.com>
+"""
 
--------------------------------------------------------------------------------
-
-Usage: singletest.py [options]
-
-This script allows you to run mbed defined test cases for particular MCU(s)
-and corresponding toolchain(s).
-
-Options:
-  -h, --help            show this help message and exit
-  -i FILE, --tests=FILE
-                        Points to file with test specification
-  -M FILE, --MUTS=FILE  Points to file with MUTs specification (overwrites
-                        settings.py and private_settings.py)
-  -g, --goanna-for-tests
-                        Run Goanna static analyse tool for tests
-  -G, --goanna-for-sdk  Run Goanna static analyse tool for mbed SDK
-  -s, --suppress-summary
-                        Suppresses display of wellformatted table with test
-                        results
-  -v, --verbose         Verbose mode (pronts some extra information)
-
-Example: singletest.py -i test_spec.json -M muts_all.json
-
--------------------------------------------------------------------------------
-
-File format example: test_spec.json
-
+"""
+File format example: test_spec.json:
 {
     "targets": {
         "KL46Z": ["ARM", "GCC_ARM"],
@@ -54,616 +30,232 @@ File format example: test_spec.json
     }
 }
 
-File format example: muts_all.json
-
+File format example: muts_all.json:
 {
     "1" : {"mcu": "LPC1768",
-        "port":"COM4", "disk":"J:\\",
-        "peripherals": ["TMP102", "digital_loop", "port_loop", "analog_loop", "SD"]
+           "port":"COM4",
+           "disk":"J:\\",
+           "peripherals": ["TMP102", "digital_loop", "port_loop", "analog_loop", "SD"]
     },
 
     "2" : {"mcu": "KL25Z",
-        "port":"COM7", "disk":"G:\\",
-        "peripherals": ["digital_loop", "port_loop", "analog_loop"]
+           "port":"COM7",
+           "disk":"G:\\",
+           "peripherals": ["digital_loop", "port_loop", "analog_loop"]
     }
 }
-
 """
 
-import sys
-import json
-import optparse
-import pprint
-import re
-from prettytable import PrettyTable
-from serial import Serial
-
-from os.path import join, abspath, dirname, exists, basename
-from shutil import copy
-from subprocess import call
-from time import sleep, time
-
-from subprocess import Popen, PIPE
-from threading import Thread
-from Queue import Queue, Empty
-
-ROOT = abspath(join(dirname(__file__), ".."))
-sys.path.insert(0, ROOT)
-
-# Imports related to mbed build pi
-from workspace_tools.build_api import build_project, build_mbed_libs, build_lib
-from workspace_tools.build_api import mcu_toolchain_matrix
-from workspace_tools.paths import BUILD_DIR
-from workspace_tools.paths import HOST_TESTS
-from workspace_tools.targets import TARGET_MAP
-from workspace_tools.tests import TEST_MAP
-from workspace_tools.tests import TESTS
-from workspace_tools.libraries import LIBRARIES
 
 # Be sure that the tools directory is in the search path
+import sys
+from os.path import join, abspath, dirname
+
 ROOT = abspath(join(dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
 
-# Imports related to mbed build pi
-from workspace_tools.utils import delete_dir_files, copy_file
-from workspace_tools.settings import MUTs
+
+# Check: Extra modules which are required by core test suite
+from workspace_tools.utils import check_required_modules
+check_required_modules(['prettytable', 'serial'])
+
+# Imports related to mbed build api
+from workspace_tools.build_api import mcu_toolchain_matrix
+
+# Imports from TEST API
+from workspace_tools.test_api import SingleTestRunner
+from workspace_tools.test_api import singletest_in_cli_mode
+from workspace_tools.test_api import detect_database_verbose
+from workspace_tools.test_api import get_json_data_from_file
+from workspace_tools.test_api import get_avail_tests_summary_table
+from workspace_tools.test_api import get_default_test_options_parser
+from workspace_tools.test_api import print_muts_configuration_from_json
+from workspace_tools.test_api import print_test_configuration_from_json
+from workspace_tools.test_api import get_autodetected_MUTS_list
+from workspace_tools.test_api import get_autodetected_TEST_SPEC
+from workspace_tools.test_api import get_module_avail
+from workspace_tools.test_exporters import ReportExporter, ResultExporterType
 
 
-class ProcessObserver(Thread):
-    def __init__(self, proc):
-        Thread.__init__(self)
-        self.proc = proc
-        self.queue = Queue()
-        self.daemon = True
-        self.active = True
-        self.start()
+# Importing extra modules which can be not installed but if available they can extend test suite functionality
+try:
+    import mbed_lstools
+    from workspace_tools.compliance.ioper_runner import IOperTestRunner
+    from workspace_tools.compliance.ioper_runner import get_available_oper_test_scopes
+except:
+    pass
 
-    def run(self):
-        while self.active:
-            c = self.proc.stdout.read(1)
-            self.queue.put(c)
-
-    def stop(self):
-        self.active = False
-        try:
-            self.proc.terminate()
-        except Exception, _:
-            pass
-
-
-class SingleTestRunner(object):
-    """ Object wrapper for single test run which may involve multiple MUTs."""
-
-    re_detect_testcase_result = None
-    TEST_RESULT_OK    = "OK"
-    TEST_RESULT_FAIL  = "FAIL"
-    TEST_RESULT_ERROR = "ERROR"
-    TEST_RESULT_UNDEF = "UNDEF"
-
-    # mbed test suite -> SingleTestRunner
-    TEST_RESULT_MAPPING = {"success" : TEST_RESULT_OK,
-                           "failure" : TEST_RESULT_FAIL,
-                           "error"   : TEST_RESULT_ERROR,
-                           "end"     : TEST_RESULT_UNDEF}
-
-    def __init__(self):
-        pattern = "\\{(" + "|".join(self.TEST_RESULT_MAPPING.keys()) + ")\\}"
-        self.re_detect_testcase_result = re.compile(pattern)
-
-    def run_simple_test(self, target_name, port,
-                        duration, verbose=False):
-        """
-        Functions resets target and grabs by timeouted pooling test log
-        via serial port.
-        Function assumes target is already flashed with proper 'test' binary.
-        """
-        output = ""
-        # Prepare serial for receiving data from target
-        baud = 9600
-        serial = Serial(port, timeout=1)
-        serial.setBaudrate(baud)
-        flush_serial(serial)
-        # Resetting target and pooling
-        reset(target_name, serial, verbose=verbose)
-        start_serial_timeour = time()
-        try:
-            while (time() - start_serial_timeour) < duration:
-                test_output = serial.read(512)
-                output += test_output
-                flush_serial(serial)
-                if '{end}' in output:
-                    break
-        except KeyboardInterrupt, _:
-            print "CTRL+C break"
-        flush_serial(serial)
-        serial.close()
-
-        # Handle verbose mode
-        if verbose:
-            print "Test::Output::Start"
-            print output
-            print "Test::Output::Finish"
-
-        # Parse test 'output' data
-        result = self.TEST_RESULT_UNDEF
-        for line in output.splitlines():
-            search_result = self.re_detect_testcase_result.search(line)
-            if search_result and len(search_result.groups()):
-                result = self.TEST_RESULT_MAPPING[search_result.groups(0)[0]]
-                break
-        return result
-
-    def handle(self, test_spec, target_name, toolchain_name):
-        """
-        Function determines MUT's mbed disk/port and copies binary to
-        target. Test is being invoked afterwards.
-        """
-        data = json.loads(test_spec)
-        # Get test information, image and test timeout
-        test_id = data['test_id']
-        test = TEST_MAP[test_id]
-        test_description = TEST_MAP[test_id].get_description()
-        image = data["image"]
-        duration = data.get("duration", 10)
-
-        # Find a suitable MUT:
-        mut = None
-        for id, m in MUTs.iteritems():
-            if m['mcu'] == data['mcu']:
-                mut = m
-                break
-
-        if mut is None:
-            print "Error: No mbed available: mut[%s]" % data['mcu']
-            return
-
-        disk = mut['disk']
-        port = mut['port']
-        target_by_mcu = TARGET_MAP[mut['mcu']]
-
-        # Program
-        # When the build and test system were separate, this was relative to a
-        # base network folder base path: join(NETWORK_BASE_PATH, )
-        image_path = image
-        if not exists(image_path):
-            print "Error: Image file does not exist: %s" % image_path
-            elapsed_time = 0
-            test_result = "{error}"
-            return (test_result, target_name, toolchain_name,
-                    test_id, test_description, round(elapsed_time, 2), duration)
-
-        #if not target_by_mcu.is_disk_virtual:
-        #    delete_dir_files(disk)
-
-        # Program MUT with proper image file
-        if not disk.endswith('/') and not disk.endswith('\\'):
-            disk += '/'
-
-        cmd = ["cp", image_path.encode('ascii','ignore'), disk.encode('ascii','ignore') +  basename(image_path).encode('ascii','ignore')]
-        # print cmd
-        call(cmd)
-        # copy(image_path, disk)
-
-        # Copy Extra Files
-        if not target_by_mcu.is_disk_virtual and test.extra_files:
-            for f in test.extra_files:
-                copy(f, disk)
-
-        sleep(target_by_mcu.program_cycle_s())
-
-        # Host test execution
-        start_host_exec_time = time()
-        #test_result = self.run_simple_test(target_name, port, duration, verbose=opts.verbose)
-        test_result = self.run_host_test(test.host_test, disk, port, duration, opts.verbose)
-        elapsed_time = time() - start_host_exec_time
-        print print_test_result(test_result, target_name, toolchain_name,
-                                test_id, test_description, elapsed_time, duration)
-        return (test_result, target_name, toolchain_name,
-                test_id, test_description, round(elapsed_time, 2), duration)
-
-    def run_host_test(self, name, disk, port, duration, verbose=False, extra_serial=""):
-        # print "{%s} port:%s disk:%s"  % (name, port, disk),
-        cmd = ["python", "%s.py" % name, '-p', port, '-d', disk, '-t', str(duration), "-e", extra_serial]
-        proc = Popen(cmd, stdout=PIPE, cwd=HOST_TESTS)
-        obs = ProcessObserver(proc)
-        start = time()
-        line = ''
-        output = []
-        while (time() - start) < duration:
-            try:
-                c = obs.queue.get(block=True, timeout=1)
-            except Empty, _:
-                c = None
-
-            if c:
-                output.append(c)
-                # Give the mbed under test a way to communicate the end of the test
-                if c in ['\n', '\r']:
-                    if '{end}' in line: break
-                    line = ''
-                else:
-                    line += c
-
-        # Stop test process
-        obs.stop()
-
-        # Handle verbose mode
-        if verbose:
-            print "Test::Output::Start"
-            print "".join(output)
-            print "Test::Output::Finish"
-
-        # Parse test 'output' data
-        result = self.TEST_RESULT_UNDEF
-        for line in "".join(output).splitlines():
-            search_result = self.re_detect_testcase_result.search(line)
-            if search_result and len(search_result.groups()):
-                result = self.TEST_RESULT_MAPPING[search_result.groups(0)[0]]
-                break
-        return result
-
-
-def flush_serial(serial):
-    """ Flushing serial in/out. """
-    serial.flushInput()
-    serial.flushOutput()
-
-
-def reset(mcu_name, serial, verbose=False, sleep_before_reset=0, sleep_after_reset=0):
+def get_version():
+    """ Returns test script version
     """
-    Functions resets target using various methods (e.g. serial break)
-    depending on target type.
-    """
-    if sleep_before_reset > 0:
-        sleep(sleep_before_reset)
-    if verbose:
-        verbose_msg = "Reset::cmd(sendBreak)"
-
-    serial.sendBreak()
-
-    if sleep_before_reset > 0:
-        sleep(sleep_after_reset)
-    if verbose:
-        print verbose_msg
-
-
-def is_peripherals_available(target_mcu_name, peripherals=None):
-    """ Checks if specified target should run specific peripheral test case."""
-    if peripherals is not None:
-        peripherals = set(peripherals)
-    for id, mut in MUTs.iteritems():
-        # Target MCU name check
-        if mut["mcu"] != target_mcu_name:
-            continue
-        # Peripherals check
-        if peripherals is not None:
-            if 'peripherals' not in mut:
-                continue
-            if not peripherals.issubset(set(mut['peripherals'])):
-                continue
-        return True
-    return False
-
-
-def print_test_result(test_result, target_name, toolchain_name,
-                      test_id, test_description, elapsed_time, duration):
-    """ Use specific convention to print test result and related data."""
-    tokens = []
-    tokens.append("TargetTest")
-    tokens.append(target_name)
-    tokens.append(toolchain_name)
-    tokens.append(test_id)
-    tokens.append(test_description)
-    separator = "::"
-    time_info = " in %.2f of %d sec" % (round(elapsed_time, 2), duration)
-    result = separator.join(tokens) + " [" + test_result +"]" + time_info
-    return result
-
-
-def shape_test_request(mcu, image_path, test_id, duration=10):
-    """ Function prepares JOSN structure describing test specification."""
-    test_spec = {
-        "mcu": mcu,
-        "image": image_path,
-        "duration": duration,
-        "test_id": test_id,
-    }
-    return json.dumps(test_spec)
-
-
-def get_json_data_from_file(json_spec_filename, verbose=False):
-    """ Loads from file JSON formatted string to data structure """
-    result = None
-    try:
-        with open(json_spec_filename) as data_file:
-            try:
-                result = json.load(data_file)
-            except ValueError as json_error_msg:
-                result = None
-                print "Error: %s" % (json_error_msg)
-    except IOError as fileopen_error_msg:
-        print "Error: %s" % (fileopen_error_msg)
-    if verbose and result:
-        pp = pprint.PrettyPrinter(indent=4)
-        pp.pprint(result)
-    return result
-
-
-def get_result_summary_table():
-        # get all unique test ID prefixes
-        unique_test_id = []
-        for test in TESTS:
-            split = test['id'].split('_')[:-1]
-            test_id_prefix = '_'.join(split)
-            if test_id_prefix not in unique_test_id:
-                unique_test_id.append(test_id_prefix)
-        unique_test_id.sort()
-        counter_dict_test_id_types = dict((t, 0) for t in unique_test_id)
-        counter_dict_test_id_types_all = dict((t, 0) for t in unique_test_id)
-
-        test_properties = ['id', 'automated', 'description', 'peripherals', 'host_test', 'duration']
-
-        # All tests status table print
-        pt = PrettyTable(test_properties)
-        for col in test_properties:
-            pt.align[col] = "l"
-        pt.align['duration'] = "r"
-
-        counter_all = 0
-        counter_automated = 0
-
-        pt.padding_width = 1 # One space between column edges and contents (default)
-        for test in TESTS:
-            row = []
-            split = test['id'].split('_')[:-1]
-            test_id_prefix = '_'.join(split)
-
-            for col in test_properties:
-                row.append(test[col] if col in test else "")
-            if 'automated' in test and test['automated'] == True:
-                counter_dict_test_id_types[test_id_prefix] += 1
-                counter_automated += 1
-            pt.add_row(row)
-            # Update counters
-            counter_all += 1
-            counter_dict_test_id_types_all[test_id_prefix] += 1
-        print pt
-        print
-
-        # Automation result summary
-        test_id_cols = ['automated', 'all', 'percent [%]', 'progress']
-        pt = PrettyTable(test_id_cols)
-        pt.align['automated'] = "r"
-        pt.align['all'] = "r"
-        pt.align['percent [%]'] = "r"
-
-        percent_progress = round(100.0 * counter_automated / float(counter_all), 1)
-        str_progress = progress_bar(percent_progress, 75)
-        pt.add_row([counter_automated, counter_all, percent_progress, str_progress])
-        print "Automation coverage:"
-        print pt
-        print
-
-        # Test automation coverage table print
-        test_id_cols = ['id', 'automated', 'all', 'percent [%]', 'progress']
-        pt = PrettyTable(test_id_cols)
-        pt.align['id'] = "l"
-        pt.align['automated'] = "r"
-        pt.align['all'] = "r"
-        pt.align['percent [%]'] = "r"
-        for unique_id in unique_test_id:
-            # print "\t\t%s: %d / %d" % (unique_id, counter_dict_test_id_types[unique_id], counter_dict_test_id_types_all[unique_id])
-            percent_progress = round(100.0 * counter_dict_test_id_types[unique_id] / float(counter_dict_test_id_types_all[unique_id]), 1)
-            str_progress = progress_bar(percent_progress, 75)
-            row = [unique_id,
-                   counter_dict_test_id_types[unique_id],
-                   counter_dict_test_id_types_all[unique_id],
-                   percent_progress,
-                   "[" + str_progress + "]"]
-            pt.add_row(row)
-        print "Test automation coverage:"
-        print pt
-        print
-
-
-def progress_bar(percent_progress, saturation=0):
-    """ This function creates progress bar with optional simple saturation mark"""
-    step = int(percent_progress / 2)    # Scale by to (scale: 1 - 50)
-    str_progress = '#' * step + '.' * int(50 - step)
-    c = '!' if str_progress[38] == '.' else '|'
-    if (saturation > 0):
-        saturation = saturation / 2
-        str_progress = str_progress[:saturation] + c + str_progress[saturation:]
-    return str_progress
+    single_test_version_major = 1
+    single_test_version_minor = 5
+    return (single_test_version_major, single_test_version_minor)
 
 
 if __name__ == '__main__':
     # Command line options
-    parser = optparse.OptionParser()
-    parser.add_option('-i', '--tests',
-                      dest='test_spec_filename',
-                      metavar="FILE",
-                      help='Points to file with test specification')
-
-    parser.add_option('-M', '--MUTS',
-                      dest='muts_spec_filename',
-                      metavar="FILE",
-                      help='Points to file with MUTs specification (overwrites settings.py and private_settings.py)')
-
-    parser.add_option('-g', '--goanna-for-tests',
-                      dest='goanna_for_tests',
-                      metavar=False,
-                      action="store_true",
-                      help='Run Goanna static analyse tool for tests')
-
-    parser.add_option('-G', '--goanna-for-sdk',
-                      dest='goanna_for_mbed_sdk',
-                      metavar=False,
-                      action="store_true",
-                      help='Run Goanna static analyse tool for mbed SDK')
-
-    parser.add_option('-s', '--suppress-summary',
-                      dest='suppress_summary',
-                      default=False,
-                      action="store_true",
-                      help='Suppresses display of wellformatted table with test results')
-
-    parser.add_option('-r', '--test-automation-report',
-                      dest='test_automation_report',
-                      default=False,
-                      action="store_true",
-                      help='Prints information about all tests and exits')
-
-    parser.add_option('-P', '--only-peripheral',
-                      dest='test_only_peripheral',
-                      default=False,
-                      action="store_true",
-                      help='Test only peripheral declared for MUT and skip common tests')
-
-    parser.add_option('-n', '--test-by-names',
-                      dest='test_by_names',
-                      help='Runs only test enumerated it this switch')
-
-    parser.add_option("-S", "--supported-toolchains",
-                      action="store_true",
-                      dest="supported_toolchains",
-                      default=False,
-                      help="Displays supported matrix of MCUs and toolchains")
-
-    parser.add_option('-v', '--verbose',
-                      dest='verbose',
-                      default=False,
-                      action="store_true",
-                      help='Verbose mode (pronts some extra information)')
+    parser = get_default_test_options_parser()
 
     parser.description = """This script allows you to run mbed defined test cases for particular MCU(s) and corresponding toolchain(s)."""
     parser.epilog = """Example: singletest.py -i test_spec.json -M muts_all.json"""
 
     (opts, args) = parser.parse_args()
 
+    # Print scrip version
+    if opts.version:
+        print parser.description
+        print parser.epilog
+        print "Version %d.%d"% get_version()
+        exit(0)
+
+    if opts.db_url and opts.verbose_test_configuration_only:
+        detect_database_verbose(opts.db_url)
+        exit(0)
+
     # Print summary / information about automation test status
     if opts.test_automation_report:
-        get_result_summary_table()
+        print get_avail_tests_summary_table(platform_filter=opts.general_filter_regex)
+        exit(0)
+
+    # Print summary / information about automation test status
+    if opts.test_case_report:
+        test_case_report_cols = ['id',
+                                 'automated',
+                                 'description',
+                                 'peripherals',
+                                 'host_test',
+                                 'duration',
+                                 'source_dir']
+        print get_avail_tests_summary_table(cols=test_case_report_cols,
+                                            result_summary=False,
+                                            join_delim='\n',
+                                            platform_filter=opts.general_filter_regex)
         exit(0)
 
     # Only prints matrix of supported toolchains
     if opts.supported_toolchains:
-        mcu_toolchain_matrix()
+        print mcu_toolchain_matrix(platform_filter=opts.general_filter_regex)
         exit(0)
 
-    # Open file with test specification
-    # test_spec_filename tells script which targets and their toolchain(s)
-    # should be covered by the test scenario
-    test_spec = get_json_data_from_file(opts.test_spec_filename, opts.verbose) if opts.test_spec_filename else None
-    if test_spec is None:
-        parser.print_help()
-        exit(-1)
+    test_spec = None
+    MUTs = None
 
-    # Get extra MUTs if applicable
-    if opts.muts_spec_filename:
-        MUTs = get_json_data_from_file(opts.muts_spec_filename, opts.verbose)
-    if MUTs is None:
-        parser.print_help()
-        exit(-1)
+    if hasattr(opts, 'auto_detect') and opts.auto_detect:
+        # If auto_detect attribute is present, we assume other auto-detection
+        # parameters like 'toolchains_filter' are also set.
+        print "MBEDLS: Detecting connected mbed-enabled devices... "
 
-    # Magic happens here... ;)
-    start = time()
-    single_test = SingleTestRunner()
+        MUTs = get_autodetected_MUTS_list()
 
-    clean = test_spec.get('clean', False)
-    test_ids = test_spec.get('test_ids', [])
-    groups = test_spec.get('test_groups', [])
+        for mut in MUTs.values():
+            print "MBEDLS: Detected %s, port: %s, mounted: %s"% (mut['mcu_unique'] if 'mcu_unique' in mut else mut['mcu'],
+                                    mut['port'],
+                                    mut['disk'])
 
-    # Here we store test results
-    test_summary = []
+        # Set up parameters for test specification filter function (we need to set toolchains per target here)
+        use_default_toolchain = 'default' in opts.toolchains_filter.split(',') if opts.toolchains_filter is not None else True
+        use_supported_toolchains = 'all' in opts.toolchains_filter.split(',') if opts.toolchains_filter is not None else False
+        toolchain_filter = opts.toolchains_filter
+        platform_name_filter = opts.general_filter_regex.split(',') if opts.general_filter_regex is not None else opts.general_filter_regex
+        # Test specification with information about each target and associated toolchain
+        test_spec = get_autodetected_TEST_SPEC(MUTs.values(),
+                                               use_default_toolchain=use_default_toolchain,
+                                               use_supported_toolchains=use_supported_toolchains,
+                                               toolchain_filter=toolchain_filter,
+                                               platform_name_filter=platform_name_filter)
+    else:
+        # Open file with test specification
+        # test_spec_filename tells script which targets and their toolchain(s)
+        # should be covered by the test scenario
+        test_spec = get_json_data_from_file(opts.test_spec_filename) if opts.test_spec_filename else None
+        if test_spec is None:
+            if not opts.test_spec_filename:
+                parser.print_help()
+            exit(-1)
 
-    for target, toolchains in test_spec['targets'].iteritems():
-        for toolchain in toolchains:
-            # print '=== %s::%s ===' % (target, toolchain)
-            # Let's build our test
-            T = TARGET_MAP[target]
-            build_mbed_libs_options = ["analyze"] if opts.goanna_for_mbed_sdk else None
-            build_mbed_libs(T, toolchain, options=build_mbed_libs_options)
-            build_dir = join(BUILD_DIR, "test", target, toolchain)
+        # Get extra MUTs if applicable
+        MUTs = get_json_data_from_file(opts.muts_spec_filename) if opts.muts_spec_filename else None
 
-            for test_id, test in TEST_MAP.iteritems():
-                if opts.test_by_names and test_id not in opts.test_by_names.split(','):
-                    continue
+        if MUTs is None:
+            if not opts.muts_spec_filename:
+                parser.print_help()
+            exit(-1)
 
-                if test_ids and test_id not in test_ids:
-                    continue
-
-                if opts.test_only_peripheral and not test.peripherals:
-                    if opts.verbose:
-                        print "TargetTest::%s::NotPeripheralTestSkipped()" % (target)
-                    continue
-
-                if test.automated and test.is_supported(target, toolchain):
-                    if not is_peripherals_available(target, test.peripherals):
-                        if opts.verbose:
-                            print "TargetTest::%s::TestSkipped(%s)" % (target, ",".join(test.peripherals))
-                        continue
-
-                    test_result = {
-                        'target': target,
-                        'toolchain': toolchain,
-                        'test_id': test_id,
-                    }
-
-                    build_project_options = ["analyze"] if opts.goanna_for_tests else None
-
-                    # Detect which lib should be added to test
-                    # Some libs have to compiled like RTOS or ETH
-                    libraries = []
-                    for lib in LIBRARIES:
-                        if lib['build_dir'] in test.dependencies:
-                            libraries.append(lib['id'])
-                    # Build libs for test
-                    for lib_id in libraries:
-                        build_lib(lib_id, T, toolchain, options=build_project_options,
-                                  verbose=opts.verbose, clean=clean)
-
-                    path = build_project(test.source_dir, join(build_dir, test_id),
-                                         T, toolchain, test.dependencies, options=build_project_options,
-                                         clean=clean, verbose=opts.verbose)
-
-                    test_result_cache = join(dirname(path), "test_result.json")
-
-                    # For an automated test the duration act as a timeout after
-                    # which the test gets interrupted
-                    test_spec = shape_test_request(target, path, test_id, test.duration)
-                    single_test_result = single_test.handle(test_spec, target, toolchain)
-                    test_summary.append(single_test_result)
-                    # print test_spec, target, toolchain
-
-    elapsed_time = time() - start
-
-    # Human readable summary
-    if not opts.suppress_summary:
-        result_dict = { single_test.TEST_RESULT_OK    : 0,
-                        single_test.TEST_RESULT_FAIL  : 0,
-                        single_test.TEST_RESULT_ERROR : 0,
-                        single_test.TEST_RESULT_UNDEF : 0 }
-
+    if opts.verbose_test_configuration_only:
+        print "MUTs configuration in %s:" % ('auto-detected' if opts.auto_detect else opts.muts_spec_filename)
+        if MUTs:
+            print print_muts_configuration_from_json(MUTs, platform_filter=opts.general_filter_regex)
         print
-        print "Test summary:"
-        # Pretty table package is used to print results
-        pt = PrettyTable(["Result", "Target", "Toolchain", "Test ID", "Test Description",
-                          "Elapsed Time (sec)", "Timeout (sec)"])
-        pt.align["Result"] = "l" # Left align
-        pt.align["Target"] = "l" # Left align
-        pt.align["Toolchain"] = "l" # Left align
-        pt.align["Test ID"] = "l" # Left align
-        pt.align["Test Description"] = "l" # Left align
-        pt.padding_width = 1 # One space between column edges and contents (default)
+        print "Test specification in %s:" % ('auto-detected' if opts.auto_detect else opts.test_spec_filename)
+        if test_spec:
+            print print_test_configuration_from_json(test_spec)
+        exit(0)
 
-        for test in test_summary:
-            if test[0] in result_dict:
-                result_dict[test[0]] += 1
-            pt.add_row(test)
-        print pt
+    if get_module_avail('mbed_lstools'):
+        if opts.operability_checks:
+            # Check if test scope is valid and run tests
+            test_scope = get_available_oper_test_scopes()
+            if opts.operability_checks in test_scope:
+                tests = IOperTestRunner(scope=opts.operability_checks)
+                test_results = tests.run()
 
-        # Print result count
-        print "Result: " + ' / '.join(['%s %s' % (value, key) for (key, value) in {k: v for k, v in result_dict.items() if v != 0}.iteritems()])
-        #print result_dict
-    print "Completed in %d sec" % (time() - start)
+                # Export results in form of JUnit XML report to separate file
+                if opts.report_junit_file_name:
+                    report_exporter = ReportExporter(ResultExporterType.JUNIT_OPER)
+                    report_exporter.report_to_file(test_results, opts.report_junit_file_name)
+            else:
+                print "Unknown interoperability test scope name: '%s'" % (opts.operability_checks)
+                print "Available test scopes: %s" % (','.join(["'%s'" % n for n in test_scope]))
+
+            exit(0)
+
+    # Verbose test specification and MUTs configuration
+    if MUTs and opts.verbose:
+        print print_muts_configuration_from_json(MUTs)
+    if test_spec and opts.verbose:
+        print print_test_configuration_from_json(test_spec)
+
+    if opts.only_build_tests:
+        # We are skipping testing phase, and suppress summary
+        opts.suppress_summary = True
+
+    single_test = SingleTestRunner(_global_loops_count=opts.test_global_loops_value,
+                                   _test_loops_list=opts.test_loops_list,
+                                   _muts=MUTs,
+                                   _clean=opts.clean,
+                                   _opts_db_url=opts.db_url,
+                                   _opts_log_file_name=opts.log_file_name,
+                                   _opts_report_html_file_name=opts.report_html_file_name,
+                                   _opts_report_junit_file_name=opts.report_junit_file_name,
+                                   _opts_report_build_file_name=opts.report_build_file_name,
+                                   _test_spec=test_spec,
+                                   _opts_goanna_for_mbed_sdk=opts.goanna_for_mbed_sdk,
+                                   _opts_goanna_for_tests=opts.goanna_for_tests,
+                                   _opts_shuffle_test_order=opts.shuffle_test_order,
+                                   _opts_shuffle_test_seed=opts.shuffle_test_seed,
+                                   _opts_test_by_names=opts.test_by_names,
+                                   _opts_peripheral_by_names=opts.peripheral_by_names,
+                                   _opts_test_only_peripheral=opts.test_only_peripheral,
+                                   _opts_test_only_common=opts.test_only_common,
+                                   _opts_verbose_skipped_tests=opts.verbose_skipped_tests,
+                                   _opts_verbose_test_result_only=opts.verbose_test_result_only,
+                                   _opts_verbose=opts.verbose,
+                                   _opts_firmware_global_name=opts.firmware_global_name,
+                                   _opts_only_build_tests=opts.only_build_tests,
+                                   _opts_parallel_test_exec=opts.parallel_test_exec,
+                                   _opts_suppress_summary=opts.suppress_summary,
+                                   _opts_test_x_toolchain_summary=opts.test_x_toolchain_summary,
+                                   _opts_copy_method=opts.copy_method,
+                                   _opts_mut_reset_type=opts.mut_reset_type,
+                                   _opts_jobs=opts.jobs,
+                                   _opts_waterfall_test=opts.waterfall_test,
+                                   _opts_consolidate_waterfall_test=opts.consolidate_waterfall_test,
+                                   _opts_extend_test_timeout=opts.extend_test_timeout,
+                                   _opts_auto_detect=opts.auto_detect)
+
+    # Runs test suite in CLI mode
+    if (singletest_in_cli_mode(single_test)):
+        exit(0)
+    else:
+        exit(-1)
