@@ -2,9 +2,12 @@ before_install:
   - date
   - cat /proc/cpuinfo
   - cd ${HOME}
-  - sudo add-apt-repository -y ppa:terry.guo/gcc-arm-embedded
-  - sudo apt-get -qq -y update
-  - sudo apt-get -qq -y install gcc-arm-none-eabi libgmp-dev
+  # Setup Python
+  - "sudo ${TRAVIS_BUILD_DIR}/travis/install_dependencies.sh > /dev/null"
+  - sudo pip install colorama
+  - sudo pip install prettytable
+  - sudo pip install jinja2
+  # Setup ATS
   - git clone https://github.com/githwxi/ATS-Postiats.git
   - ./ATS-Postiats/travis-ci/installpkg.sh
   # Build ATS1
