@@ -11,7 +11,7 @@ before_install:
   - export ATSHOME=${HOME}/ats-lang-anairiats-0.2.11
   - export ATSHOMERELOC=ATS-0.2.11
   - ./ATS-Postiats/travis-ci/ats1_setup.sh 0.2.11
-  - cd $(ATSHOME) && ./configure && make all
+  - cd ${ATSHOME} && ./configure && make all
   # Build ATS2
   - export PATSHOME=${HOME}/ATS-Postiats
   - export PATSHOMERELOC=${PATSHOME}
