@@ -6,10 +6,11 @@ before_install:
   - sudo apt-get -qq -y update
   - sudo apt-get -qq -y install gcc-arm-none-eabi libgmp-dev
   - git clone https://github.com/githwxi/ATS-Postiats.git
+  - ./ATS-Postiats/travis-ci/installpkg.sh
   # Build ATS1
   - export ATSHOME=${HOME}/ats-lang-anairiats-0.2.11
   - export ATSHOMERELOC=ATS-0.2.11
-  - ./ATS-Postiats/travis-ci/setup.sh 0.2.11
+  - ./ATS-Postiats/travis-ci/ats1_setup.sh 0.2.11
   # Build ATS2
   - export PATSHOME=${HOME}/ATS-Postiats
   - export PATSHOMERELOC=${PATSHOME}
